@@ -1,0 +1,1798 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ZETA LABS — Human Glitche · captación y venta en una sola app</title>
+<meta name="description" content="La app de captación y venta de Human Glitche: auditoría de leads, embudo, propuesta autogenerada, catálogo de pipelines y guía de venta — todo alrededor del lead.">
+<!--
+  ZETA LABS — fusión de AUDITORÍA + PIPELINES + PROPUESTA (+ EMBUDO + GUÍA DE VENTA)
+  en una sola app de captación y venta. Pedido del owner 2026-08-21: "creemos zeta
+  labs que sea la mejor app, va a tener su subdominio labs".
+
+  PRINCIPIO: el LEAD es la entidad central. La auditoría detecta gaps → los gaps
+  mapean a servicios del catálogo → la propuesta se autoarma → el embudo registra
+  el estado → el pulso mide el funnel. Cero re-tipeo entre herramientas.
+
+  COMPATIBILIDAD DE DATOS (no rompe nada de lo existente):
+    · hg_pipelines_precios / hg_pipelines_moneda — misma clave que PIPELINES /
+      PROPUESTA / GUÍA: editar un precio acá impacta allá y viceversa.
+    · hg_embudo_v1 — mismo store que EMBUDO (cards {id,name,city,type,stage,
+      tags[],next,due,val,notes}); lo ya cargado aparece acá tal cual.
+    · hg_aud_favs — favoritos de AUDITORÍA.
+    · hg_zeta_propuestas / hg_zeta_cfg — nuevos, propios de esta app.
+  FUENTE DE LEADS: misma cadena que PIPELINES — Firebase /comercios (lectura
+  pública, si el backend está activo) → seed_comercios_pba.json → fallback demo.
+  Esta app NO escribe Firebase, NO cobra, NO publica: client-side puro.
+  Publicar en el subdominio labs.hg-vl.com = GATES (acción humana).
+
+  Construido directo bajo la excepción temporal de costo de CLAUDE.md (sin
+  productor/guardian por ítem) — work_list.json deja el ítem en in_progress
+  hasta la inspección completa diferida.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --acid:#b8ff00; --glitch:#ff2d55; --cyan:#3ad0ff; --gold:#ffcc33; --violet:#7d7bff;
+    --ok:#5ad88a; --ink:#f0ede6; --mut:rgba(240,237,230,.55); --dim:rgba(240,237,230,.4);
+    --line:rgba(240,237,230,.12); --line-s:rgba(240,237,230,.26);
+    --bg:#050505; --panel:#0c0c0c; --panel2:#101010; --r:10px;
+    --paper:#faf9f6; --pink:#12100c; --pline:#e3ded2; --pmut:#6b6656;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{min-height:100%;background:var(--bg);color:var(--ink);font-family:'DM Sans',system-ui,sans-serif;}
+  body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");z-index:0;pointer-events:none;opacity:.4;}
+  .wrap{position:relative;z-index:1;max-width:1440px;margin:0 auto;padding:22px 20px 96px;}
+  a{color:var(--cyan);text-decoration:none;}
+
+  header.top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:16px;}
+  .brand{font-family:'Bebas Neue',sans-serif;font-size:44px;letter-spacing:.03em;line-height:.82;}
+  .brand b{color:var(--acid);font-weight:400;}
+  .brand em{font-style:normal;color:var(--violet);}
+  .brand .sub{display:block;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.18em;color:var(--dim);margin-top:7px;text-transform:uppercase;}
+  .hdr-links{display:flex;gap:14px;align-items:center;}
+  .hdr-links a{font-size:10px;letter-spacing:.2em;color:var(--dim);font-family:'Space Mono',monospace;}
+  .hdr-links a:hover{color:var(--acid);}
+
+  /* ── nav ── */
+  nav.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:18px;flex-wrap:wrap;position:sticky;top:0;background:var(--bg);z-index:30;padding-top:4px;}
+  nav.tabs button{background:none;border:none;border-bottom:2px solid transparent;color:var(--mut);font-family:'Space Mono',monospace;font-size:12px;letter-spacing:.05em;padding:10px 14px;cursor:pointer;margin-bottom:-1px;display:flex;gap:7px;align-items:center;white-space:nowrap;}
+  nav.tabs button.on{color:var(--acid);border-bottom-color:var(--acid);}
+  nav.tabs button:hover{color:var(--ink);}
+  nav.tabs .cnt{font-size:9px;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:1px 7px;color:var(--dim);}
+  main section.view{display:none;} main section.view.on{display:block;}
+
+  /* ── genéricos ── */
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px;margin-bottom:14px;}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:.7rem .9rem;}
+  .stat .l{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-family:'Space Mono',monospace;margin-bottom:4px;}
+  .stat .v{font-family:'Bebas Neue',sans-serif;font-size:27px;line-height:1;}
+  .stat .v small{font-size:13px;color:var(--mut);}
+  .v-acid{color:var(--acid);} .v-gold{color:var(--gold);} .v-ok{color:var(--ok);} .v-cyan{color:var(--cyan);} .v-glitch{color:var(--glitch);} .v-violet{color:var(--violet);}
+  .seclabel{font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--dim);margin:22px 0 12px;display:flex;align-items:center;gap:10px;font-family:'Space Mono',monospace;}
+  .seclabel::after{content:'';flex:1;height:1px;background:var(--line);}
+  .btn{cursor:pointer;background:transparent;border:1px solid var(--line-s);color:var(--ink);font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.1em;padding:8px 13px;border-radius:7px;transition:.15s;text-transform:uppercase;}
+  .btn:hover{border-color:var(--acid);color:var(--acid);}
+  .btn.pri{background:var(--acid);color:#050505;border-color:var(--acid);font-weight:700;}
+  .btn.pri:hover{filter:brightness(1.08);color:#050505;}
+  .btn.on{border-color:var(--acid);color:var(--acid);background:rgba(184,255,0,.07);}
+  .btn.danger{border-color:rgba(255,45,85,.4);color:var(--glitch);}
+  .btn.sm{padding:5px 9px;font-size:9px;}
+  input,select,textarea{background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-family:'Space Mono',monospace;font-size:12px;padding:8px 10px;border-radius:7px;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acid);}
+  textarea{resize:vertical;font-family:'DM Sans',sans-serif;line-height:1.6;}
+  .pill{font-size:9px;letter-spacing:.08em;padding:3px 9px;border-radius:20px;border:1px solid var(--line-s);font-family:'Space Mono',monospace;white-space:nowrap;}
+  .toast{position:fixed;bottom:74px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--acid);color:#050505;font-size:11px;font-weight:700;letter-spacing:.08em;padding:10px 18px;border-radius:7px;opacity:0;pointer-events:none;transition:.25s;z-index:99;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .empty{text-align:center;padding:2.2rem 1rem;color:var(--dim);font-size:12px;line-height:1.7;}
+  .empty .ico{font-size:26px;display:block;margin-bottom:.6rem;}
+
+  /* ── PULSO ── */
+  .funnel-bars{display:flex;flex-direction:column;gap:7px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;}
+  .fb-row{display:grid;grid-template-columns:96px 1fr 34px;gap:10px;align-items:center;font-size:11px;font-family:'Space Mono',monospace;cursor:pointer;}
+  .fb-row .fn{color:var(--mut);} .fb-row .fc{text-align:right;color:var(--ink);}
+  .fb-track{height:14px;background:var(--panel2);border:1px solid var(--line);border-radius:20px;overflow:hidden;}
+  .fb-fill{height:100%;border-radius:20px;transition:width .3s;}
+  .pulso-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;}
+  @media(max-width:900px){.pulso-cols{grid-template-columns:1fr;}}
+  .plist{display:flex;flex-direction:column;gap:7px;}
+  .prow{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:.65rem .85rem;display:flex;gap:10px;align-items:center;cursor:pointer;transition:.15s;}
+  .prow:hover{border-color:var(--line-s);}
+  .prow .pn{flex:1;min-width:0;} .prow .pn b{font-size:12.5px;font-weight:500;display:block;}
+  .prow .pn small{font-size:10px;color:var(--dim);font-family:'Space Mono',monospace;}
+  .prow .px{font-size:10px;font-family:'Space Mono',monospace;color:var(--mut);white-space:nowrap;text-align:right;}
+  .prow.due .px{color:var(--glitch);}
+
+  /* ── LEADS ── */
+  .lead-toolbar{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px;align-items:center;position:sticky;top:44px;z-index:25;background:var(--bg);padding:6px 0;}
+  .fchip{font-size:10px;padding:5px 11px;border-radius:20px;border:1px solid var(--line-s);background:transparent;color:var(--mut);cursor:pointer;font-family:'Space Mono',monospace;white-space:nowrap;}
+  .fchip.on{background:rgba(184,255,0,.12);color:var(--acid);border-color:var(--acid);}
+  .lead-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,430px);gap:14px;align-items:start;}
+  @media(max-width:980px){.lead-layout{grid-template-columns:1fr;}}
+  .lead-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:9px;}
+  @media(min-width:981px){.lead-grid{grid-template-columns:1fr 1fr;}}
+  .lcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:.8rem .9rem;cursor:pointer;transition:border-color .15s;position:relative;}
+  .lcard:hover{border-color:var(--line-s);} .lcard.sel{border-color:var(--acid);}
+  .lcard .ln{font-size:13px;font-weight:500;padding-right:26px;}
+  .lcard .lm{font-size:10.5px;color:var(--dim);font-family:'Space Mono',monospace;margin-top:2px;}
+  .lcard .lrate{font-size:10px;color:var(--gold);font-family:'Space Mono',monospace;}
+  .lchips{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px;}
+  .lch{font-size:9px;padding:2px 7px;border-radius:20px;font-family:'Space Mono',monospace;}
+  .lch.has{background:rgba(90,216,138,.1);color:var(--ok);}
+  .lch.no{background:rgba(255,45,85,.1);color:var(--glitch);}
+  .scorebar{height:5px;background:var(--panel2);border-radius:20px;overflow:hidden;margin-top:8px;}
+  .scorebar i{display:block;height:100%;background:linear-gradient(90deg,var(--glitch),var(--gold),var(--acid));border-radius:20px;}
+  .stagepill{position:absolute;top:9px;right:9px;font-size:8.5px;letter-spacing:.06em;padding:2px 8px;border-radius:20px;font-family:'Space Mono',monospace;border:1px solid;}
+  .fav-star{position:absolute;bottom:8px;right:9px;background:none;border:none;color:rgba(240,237,230,.2);font-size:15px;cursor:pointer;line-height:1;}
+  .fav-star.on{color:var(--gold);}
+  .pager{display:flex;justify-content:center;align-items:center;gap:12px;margin-top:12px;font-family:'Space Mono',monospace;font-size:11px;color:var(--mut);}
+
+  /* detalle */
+  .detail{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:1rem 1.05rem;position:sticky;top:96px;max-height:calc(100vh - 170px);overflow-y:auto;}
+  .detail::-webkit-scrollbar{width:5px;} .detail::-webkit-scrollbar-thumb{background:var(--line-s);border-radius:4px;}
+  .detail h3{font-family:'Bebas Neue',sans-serif;font-size:24px;font-weight:400;letter-spacing:.02em;line-height:.95;}
+  .detail .dmeta{font-size:11px;color:var(--mut);font-family:'Space Mono',monospace;margin-top:3px;}
+  .detail .dmeta b{color:var(--cyan);font-weight:400;}
+  .d-actions{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0;}
+  .dscore{margin:10px 0;}
+  .dscore .t{display:flex;justify-content:space-between;font-size:10px;color:var(--mut);font-family:'Space Mono',monospace;margin-bottom:4px;}
+  .dscore .t b{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--acid);line-height:1;}
+  .reco{border:1px solid var(--line);border-radius:9px;margin-bottom:7px;overflow:hidden;}
+  .reco.rec{border-color:rgba(184,255,0,.35);background:rgba(184,255,0,.03);}
+  .reco label{display:flex;gap:9px;align-items:center;padding:8px 10px;cursor:pointer;}
+  .reco input{accent-color:var(--acid);width:14px;height:14px;flex-shrink:0;}
+  .reco .ri{font-size:15px;} .reco .rn{flex:1;font-size:11.5px;font-weight:500;}
+  .reco .rn small{display:block;font-size:9.5px;color:var(--acid);font-weight:400;font-family:'Space Mono',monospace;margin-top:1px;}
+  .reco .rn small.soft{color:var(--dim);}
+  .reco .rp{font-size:10px;color:var(--cyan);font-family:'Space Mono',monospace;white-space:nowrap;text-align:right;}
+  .d-funnel{border-top:1px solid var(--line);margin-top:12px;padding-top:12px;}
+  .fl{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-family:'Space Mono',monospace;margin-bottom:7px;}
+  .frow{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px;}
+  .frow.single{grid-template-columns:1fr;}
+  .frow label{display:block;font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:'Space Mono',monospace;margin-bottom:3px;}
+  .frow input,.frow select,.frow textarea{width:100%;}
+  .detail-empty{border:1px dashed var(--line-s);border-radius:12px;padding:2.4rem 1.2rem;text-align:center;color:var(--dim);font-size:12px;line-height:1.7;position:sticky;top:96px;}
+  .wanote{font-size:10px;color:var(--dim);line-height:1.6;margin-top:8px;font-family:'Space Mono',monospace;}
+
+  /* escaneo de redes (Worker) */
+  .scanbox{border:1px solid var(--line);border-radius:9px;padding:9px 10px;margin:10px 0 4px;}
+  .scanbox .sr{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;}
+  .scanbox .sr a{font-size:9.5px;padding:3px 8px;border-radius:20px;border:1px solid rgba(90,216,138,.4);color:var(--ok);font-family:'Space Mono',monospace;}
+  .scanbox .sr .dead{border-color:rgba(255,45,85,.4);color:var(--glitch);font-size:9.5px;padding:3px 8px;border-radius:20px;border-style:solid;border-width:1px;font-family:'Space Mono',monospace;}
+  .scanstatus{font-size:10px;font-family:'Space Mono',monospace;margin-top:6px;}
+  .scanstatus.ok{color:var(--ok);} .scanstatus.err{color:var(--glitch);} .scanstatus.run{color:var(--cyan);}
+
+  /* buscador de negocios (Google Places) */
+  .searchpanel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:12px;}
+  .sp-row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;}
+  .sp-row .fld{margin-bottom:0;min-width:150px;flex:1;}
+  .sp-row .fld.narrow{flex:0 1 210px;}
+  .spres{display:flex;flex-direction:column;gap:7px;margin-top:10px;}
+  .spitem{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:.6rem .8rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .spitem .sn{flex:1;min-width:170px;} .spitem .sn b{font-size:12.5px;font-weight:500;display:block;}
+  .spitem .sn small{font-size:10px;color:var(--dim);font-family:'Space Mono',monospace;}
+  .spitem .dup{font-size:8.5px;letter-spacing:.08em;color:var(--gold);border:1px solid rgba(255,204,51,.35);border-radius:20px;padding:2px 8px;font-family:'Space Mono',monospace;}
+  .spstatus{font-size:10.5px;font-family:'Space Mono',monospace;margin-top:8px;color:var(--mut);}
+  .spstatus.err{color:var(--glitch);} .spstatus.ok{color:var(--ok);}
+  .keyprompt{border:1px dashed var(--line-s);border-radius:9px;padding:11px 12px;margin-top:10px;font-size:11px;color:var(--mut);line-height:1.7;}
+  .keyprompt input{width:min(300px,100%);margin:6px 0;}
+  .localtag{font-size:8.5px;letter-spacing:.08em;color:var(--violet);border:1px solid rgba(125,123,255,.4);border-radius:20px;padding:2px 8px;font-family:'Space Mono',monospace;}
+
+  /* ── EMBUDO ── */
+  .board{display:grid;grid-template-columns:repeat(5,minmax(216px,1fr));gap:10px;overflow-x:auto;align-items:start;padding-bottom:8px;}
+  @media(max-width:1100px){.board{display:flex;}.board .col{min-width:236px;flex-shrink:0;}}
+  .col{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px;}
+  .col .ch{display:flex;justify-content:space-between;align-items:center;font-family:'Space Mono',monospace;font-size:10.5px;letter-spacing:.06em;padding:2px 4px 9px;}
+  .col .ch .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;}
+  .col .cc{color:var(--dim);}
+  .col .cards{display:flex;flex-direction:column;gap:7px;min-height:34px;}
+  .kcard{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:.6rem .7rem;cursor:grab;}
+  .kcard:active{cursor:grabbing;} .kcard.drag{opacity:.4;}
+  .kcard .kn{font-size:12px;font-weight:500;}
+  .kcard .km{font-size:9.5px;color:var(--dim);font-family:'Space Mono',monospace;margin-top:1px;}
+  .kcard .ktags{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px;}
+  .kcard .tg{font-size:8.5px;padding:1px 6px;border-radius:20px;background:rgba(125,123,255,.12);color:var(--violet);font-family:'Space Mono',monospace;}
+  .kcard .knext{font-size:10px;color:var(--mut);margin-top:5px;line-height:1.4;}
+  .kcard .knext.due{color:var(--glitch);}
+  .kcard .kval{font-size:10px;color:var(--acid);font-family:'Space Mono',monospace;margin-top:4px;}
+  .kcard .kmove{display:flex;gap:5px;margin-top:7px;}
+  .kcard .kmove button{flex:1;background:transparent;border:1px solid var(--line);color:var(--mut);border-radius:6px;font-size:10px;padding:3px 0;cursor:pointer;}
+  .kcard .kmove button:hover{border-color:var(--acid);color:var(--acid);}
+  .col .cards.over{outline:1.5px dashed var(--acid);outline-offset:3px;border-radius:9px;}
+
+  /* ── PROPUESTA ── */
+  .prop-cols{display:grid;grid-template-columns:340px minmax(0,1fr);gap:18px;align-items:start;}
+  @media(max-width:980px){.prop-cols{grid-template-columns:1fr;}}
+  .editor{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;position:sticky;top:60px;max-height:calc(100vh - 80px);overflow-y:auto;}
+  @media(max-width:980px){.editor{position:static;max-height:none;}}
+  .editor::-webkit-scrollbar{width:5px;} .editor::-webkit-scrollbar-thumb{background:var(--line-s);border-radius:4px;}
+  .grp{margin-bottom:14px;}
+  .grp .gl{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);font-family:'Space Mono',monospace;margin-bottom:7px;display:flex;align-items:center;gap:8px;}
+  .grp .gl::after{content:'';flex:1;height:1px;background:var(--line);}
+  .fld{margin-bottom:8px;}
+  .fld label{display:block;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-family:'Space Mono',monospace;margin-bottom:3px;}
+  .fld input,.fld select,.fld textarea{width:100%;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .svc{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;margin-bottom:5px;cursor:pointer;transition:.12s;}
+  .svc.on{border-color:var(--acid);background:rgba(184,255,0,.05);}
+  .svc input{accent-color:var(--acid);width:13px;height:13px;flex-shrink:0;}
+  .svc .ic{font-size:14px;} .svc .nm{flex:1;font-size:10.5px;font-family:'Space Mono',monospace;letter-spacing:.02em;}
+  .svc .pr{font-size:9.5px;color:var(--cyan);font-family:'Space Mono',monospace;white-space:nowrap;}
+  .btnrow{display:flex;gap:7px;margin-top:7px;}
+  .btnrow .btn{flex:1;}
+  .doc{background:var(--paper);color:var(--pink);border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,.5);padding:48px 50px;font-size:13px;line-height:1.65;}
+  @media(max-width:640px){.doc{padding:26px 20px;}}
+  .doc .dhead{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;border-bottom:2px solid var(--pink);padding-bottom:14px;margin-bottom:20px;flex-wrap:wrap;}
+  .doc .dbrand{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:.02em;line-height:.85;color:var(--pink);}
+  .doc .dbrand em{font-style:normal;border-bottom:4px solid var(--acid);}
+  .doc .dbrand small{display:block;font-family:'Space Mono',monospace;font-size:9.5px;letter-spacing:.18em;color:var(--pmut);margin-top:8px;text-transform:uppercase;}
+  .doc .dmeta2{text-align:right;font-size:11px;color:var(--pmut);line-height:1.7;}
+  .doc .dmeta2 b{color:var(--pink);}
+  .doc .dtitle{font-family:'Bebas Neue',sans-serif;font-size:29px;letter-spacing:.02em;line-height:.95;margin-bottom:4px;}
+  .doc .dfor{font-size:13px;color:var(--pmut);margin-bottom:20px;}
+  .doc .dfor b{color:var(--pink);}
+  .doc h3.sec{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:.06em;text-transform:uppercase;margin:24px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--pline);display:flex;align-items:baseline;gap:8px;}
+  .doc h3.sec .n{font-family:'Space Mono',monospace;font-size:10px;color:var(--acid);background:var(--pink);padding:2px 6px;border-radius:3px;letter-spacing:.1em;}
+  .doc .diag{white-space:pre-wrap;font-size:12.5px;color:#2a2822;}
+  .svccard{border:1px solid var(--pline);border-radius:6px;padding:13px 15px;margin-bottom:10px;page-break-inside:avoid;}
+  .svccard .st{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;}
+  .svccard .snm{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.03em;}
+  .svccard .spr{font-size:12px;white-space:nowrap;text-align:right;}
+  .svccard .spr b{font-size:14px;} .svccard .spr small{color:var(--pmut);}
+  .svccard .sdesc{font-size:12px;color:#43403a;margin:5px 0 8px;}
+  .svccard .snodes{display:flex;flex-wrap:wrap;gap:5px;}
+  .svccard .snodes span{font-size:10px;color:#4a473f;background:#efece3;border:1px solid var(--pline);border-radius:4px;padding:2px 7px;}
+  .totbox{border:2px solid var(--pink);border-radius:6px;overflow:hidden;margin-top:6px;page-break-inside:avoid;}
+  .totbox .tr{display:flex;justify-content:space-between;padding:9px 15px;font-size:12.5px;border-bottom:1px solid var(--pline);}
+  .totbox .tr:last-child{border-bottom:none;}
+  .totbox .tr.big{background:var(--pink);color:var(--paper);} .totbox .tr.big b{color:var(--acid);}
+  .totbox .tr.sub{color:var(--pmut);font-size:11.5px;}
+  .cond{font-size:12px;color:#3a382f;} .cond li{margin:5px 0 5px 18px;}
+  .cond b{color:var(--pink);}
+  .dfoot{margin-top:26px;padding-top:14px;border-top:2px solid var(--pink);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--pmut);}
+  .dfoot b{color:var(--pink);}
+  .doc-empty{color:var(--pmut);font-size:13px;text-align:center;padding:40px 0;}
+  .hist{display:flex;flex-direction:column;gap:7px;margin-top:8px;}
+  .hrow{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:.6rem .8rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .hrow .hn{flex:1;min-width:140px;} .hrow .hn b{font-size:12px;font-weight:500;display:block;}
+  .hrow .hn small{font-size:10px;color:var(--dim);font-family:'Space Mono',monospace;}
+  .hrow .hv{font-size:11px;color:var(--acid);font-family:'Space Mono',monospace;white-space:nowrap;}
+  .hrow select{font-size:10px;padding:4px 6px;}
+
+  /* ── CATÁLOGO ── */
+  .cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:10px;}
+  .pcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;}
+  .pcard .head{display:flex;gap:11px;align-items:flex-start;padding:13px 14px 9px;}
+  .pcard .ico{font-size:20px;line-height:1;}
+  .pcard h3{font-family:'Bebas Neue',sans-serif;font-size:21px;letter-spacing:.03em;color:var(--acid);line-height:.9;font-weight:400;}
+  .pcard .tag{font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-top:3px;font-family:'Space Mono',monospace;}
+  .pcard p.desc{font-size:11px;color:var(--mut);line-height:1.6;padding:0 14px 10px;}
+  .pcard .priceline{display:flex;gap:12px;flex-wrap:wrap;padding:0 14px 12px;font-size:10.5px;font-family:'Space Mono',monospace;align-items:center;}
+  .pcard .priceline b{color:var(--acid);}
+  .pcard .priceline .mg{color:var(--cyan);font-size:9.5px;margin-left:auto;}
+  .pcard .flow{display:flex;flex-wrap:wrap;gap:4px;padding:0 14px 12px;}
+  .pcard .flow span{font-size:9px;color:var(--mut);background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:3px 7px;font-family:'Space Mono',monospace;}
+  .priceedit{background:var(--panel2);border:1px solid var(--acid);color:var(--acid);font-family:'Space Mono',monospace;font-size:11px;width:60px;padding:3px 5px;border-radius:4px;}
+
+  /* ── GUÍA ── */
+  .steps{display:flex;flex-direction:column;gap:8px;}
+  .step{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);overflow:hidden;}
+  .step .head{display:flex;gap:13px;align-items:baseline;padding:12px 14px;cursor:pointer;}
+  .step .num{font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--acid);min-width:26px;line-height:1;}
+  .step h3{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:.03em;line-height:.95;flex:1;font-weight:400;}
+  .step .hint{font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-family:'Space Mono',monospace;}
+  .step .body{display:none;padding:0 16px 14px 53px;font-size:12px;color:var(--mut);line-height:1.75;}
+  .step.open .body{display:block;}
+  .step .body b{color:var(--acid);font-weight:500;}
+  .rules{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:9px;}
+  .rule{border:1px solid var(--line);border-radius:9px;background:var(--panel);padding:11px 12px;font-size:11px;line-height:1.65;color:var(--mut);}
+  .rule b{color:var(--acid);font-weight:500;display:block;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;font-family:'Space Mono',monospace;}
+  .svcsel{display:flex;flex-wrap:wrap;gap:7px;}
+  .svcbtn{cursor:pointer;background:transparent;border:1px solid var(--line);color:var(--mut);font-family:'Space Mono',monospace;font-size:9.5px;letter-spacing:.05em;padding:7px 10px;border-radius:7px;transition:.15s;display:flex;gap:6px;align-items:center;}
+  .svcbtn.on{border-color:var(--acid);color:var(--acid);background:rgba(184,255,0,.07);}
+  .guide{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:16px 16px 18px;margin-top:14px;}
+  .guide h2{font-family:'Bebas Neue',sans-serif;font-size:29px;letter-spacing:.02em;color:var(--acid);line-height:.9;font-weight:400;}
+  .guide .gtag{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-top:4px;font-family:'Space Mono',monospace;}
+  .guide .gtop{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;}
+  .guide .price{font-size:11px;color:var(--mut);text-align:right;line-height:1.6;font-family:'Space Mono',monospace;}
+  .guide .price b{color:var(--acid);}
+  .blk{margin-top:15px;}
+  .blk .bl{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:7px;display:flex;align-items:center;gap:9px;font-family:'Space Mono',monospace;}
+  .blk .bl .cp{cursor:pointer;border:1px solid var(--line);border-radius:5px;padding:3px 8px;color:var(--mut);transition:.15s;}
+  .blk .bl .cp:hover{border-color:var(--acid);color:var(--acid);}
+  .script{border:1px solid var(--line);border-left:3px solid var(--acid);border-radius:6px;background:var(--panel2);padding:11px 13px;font-size:12px;line-height:1.75;color:rgba(240,237,230,.8);white-space:pre-wrap;}
+  .qs .q{font-size:12px;line-height:1.65;color:rgba(240,237,230,.72);padding-left:16px;position:relative;margin-bottom:6px;}
+  .qs .q::before{content:'?';position:absolute;left:0;color:var(--cyan);font-family:'Space Mono',monospace;}
+  .obj{border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-bottom:7px;}
+  .obj .o{padding:9px 12px;font-size:11px;color:var(--glitch);background:rgba(255,45,85,.05);line-height:1.55;}
+  .obj .o::before{content:'✗ “';} .obj .o::after{content:'”';}
+  .obj .r{padding:9px 12px;font-size:12px;color:rgba(240,237,230,.75);line-height:1.7;border-top:1px solid var(--line);}
+  .obj .r::before{content:'→ ';color:var(--acid);}
+  .close-blk{border:1px solid rgba(184,255,0,.35);border-radius:6px;background:rgba(184,255,0,.05);padding:11px 13px;font-size:12px;line-height:1.75;}
+  .close-blk::before{content:'⚡ CIERRE — ';color:var(--acid);font-size:9px;letter-spacing:.14em;font-family:'Space Mono',monospace;}
+
+  .note{font-size:10px;color:var(--dim);line-height:1.7;margin-top:28px;border-left:1px solid rgba(184,255,0,.3);padding-left:12px;font-family:'Space Mono',monospace;}
+  .note b{color:var(--acid);font-weight:400;}
+  .foot{font-size:10px;color:rgba(240,237,230,.32);letter-spacing:.1em;margin-top:26px;text-align:center;font-family:'Space Mono',monospace;}
+
+  /* mobile bottom nav */
+  @media(max-width:760px){
+    nav.tabs{position:fixed;top:auto;bottom:0;left:0;right:0;background:rgba(5,5,5,.96);backdrop-filter:blur(10px);border-top:1px solid var(--line);border-bottom:none;margin:0;padding:4px 4px calc(4px + env(safe-area-inset-bottom));justify-content:space-around;z-index:50;}
+    nav.tabs button{flex-direction:column;gap:2px;font-size:8px;padding:6px 6px;border-bottom:none;border-top:2px solid transparent;letter-spacing:.03em;}
+    nav.tabs button.on{border-top-color:var(--acid);border-bottom:none;}
+    nav.tabs button .tico{font-size:16px;}
+    nav.tabs .cnt{display:none;}
+    .lead-toolbar{top:0;}
+    .detail,.detail-empty{position:static;max-height:none;}
+  }
+  @media(min-width:761px){ nav.tabs button .tico{font-size:13px;} }
+
+  /* impresión: solo el documento de propuesta */
+  @media print{
+    @page{margin:14mm;}
+    body{background:#fff;} body::before{display:none;}
+    .wrap{max-width:none;padding:0;}
+    header.top,nav.tabs,.editor,.seclabel,.hist,.note,.foot,.toast,#prop-actions{display:none!important;}
+    main section.view{display:none!important;}
+    main section#view-propuesta{display:block!important;}
+    .prop-cols{display:block;}
+    .doc{box-shadow:none;border-radius:0;padding:0;}
+  }
+  :focus-visible{outline:2px solid var(--acid);outline-offset:2px;}
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;}}
+</style></head><body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><b>ZETA</b> <em>LABS</em><span class="sub">captación y venta · todo alrededor del lead</span></div>
+    <div class="hdr-links"><a href="/labs/">← LABS</a><a href="/auditoria/">AUDITORÍA</a></div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-view="pulso" class="on"><span class="tico">⚡</span> PULSO</button>
+    <button data-view="leads"><span class="tico">⌖</span> LEADS <span class="cnt" id="cnt-leads">0</span></button>
+    <button data-view="embudo"><span class="tico">🫙</span> EMBUDO <span class="cnt" id="cnt-embudo">0</span></button>
+    <button data-view="propuesta"><span class="tico">📄</span> PROPUESTA</button>
+    <button data-view="catalogo"><span class="tico">🔀</span> CATÁLOGO</button>
+    <button data-view="guia"><span class="tico">📗</span> GUÍA</button>
+  </nav>
+
+  <main>
+    <!-- ════════ PULSO ════════ -->
+    <section class="view on" id="view-pulso">
+      <div class="stat-grid" id="pulsoStats"></div>
+      <div class="pulso-cols">
+        <div>
+          <div class="seclabel" style="margin-top:0">El embudo hoy</div>
+          <div class="funnel-bars" id="funnelBars"></div>
+          <div class="seclabel">Próximas acciones</div>
+          <div class="plist" id="nextActions"></div>
+        </div>
+        <div>
+          <div class="seclabel" style="margin-top:0">Para atacar ahora — peor salud digital, sin trabajar</div>
+          <div class="plist" id="hotLeads"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ LEADS ════════ -->
+    <section class="view" id="view-leads">
+      <div class="lead-toolbar">
+        <input id="q" placeholder="🔍 Buscar lead…" autocomplete="off" style="min-width:150px;">
+        <select id="fCity"><option value="">Ciudad: todas</option></select>
+        <select id="fType"><option value="">Rubro: todos</option></select>
+        <button class="fchip" data-f="all">Todos</button>
+        <button class="fchip" data-f="no-web">Sin web</button>
+        <button class="fchip" data-f="no-social">Sin redes</button>
+        <button class="fchip" data-f="fav">★ Favoritos</button>
+        <button class="fchip" data-f="funnel">En embudo</button>
+        <select id="fSort">
+          <option value="score">Peor salud primero</option>
+          <option value="reviews">Más reseñas</option>
+          <option value="rating">Mejor rating</option>
+          <option value="name">Nombre A–Z</option>
+        </select>
+        <button class="btn sm" id="spToggle">🔎 Buscar negocios</button>
+      </div>
+
+      <!-- BUSCADOR DE NEGOCIOS (Google Places, misma key/esquema que Auditoría y Depo Zeta) -->
+      <div class="searchpanel" id="searchPanel" style="display:none">
+        <div class="sp-row">
+          <div class="fld narrow"><label>Lugar (libre)</label><input id="spLugar" list="zCities" placeholder="Ensenada, Berisso, Córdoba…" autocomplete="off"><datalist id="zCities"></datalist></div>
+          <div class="fld narrow"><label>Qué buscar</label><input id="spQuery" value="comercios" placeholder="panadería, peluquería…"></div>
+          <button class="btn pri" id="spGo">⌖ BUSCAR</button>
+        </div>
+        <div id="spKey"></div>
+        <p class="wanote">Google trae nombre, dirección, ubicación y rating confirmados — <b>no</b> redes (eso lo resuelve el escaneo ⚡ de su web al sumarlo). Cada búsqueda y cada "sumar" (trae web + teléfono de la ficha) consumen cuota paga de tu cuenta de Google Cloud: por eso es manual, nunca se dispara sola. Los resultados que sumes quedan como <b>leads locales de este navegador</b> — la Auditoría pública se alimenta solo desde su panel de moderación (gate).</p>
+        <div class="spstatus" id="spStatus"></div>
+        <div class="spres" id="spResults"></div>
+      </div>
+      <div class="lead-layout">
+        <div>
+          <div class="lead-grid" id="leadGrid"></div>
+          <div class="pager" id="leadPager"></div>
+        </div>
+        <div id="detailWrap">
+          <div class="detail-empty" id="detailEmpty"><span style="font-size:24px;display:block;margin-bottom:8px;">☞</span>Elegí un lead para ver su ficha, sus gaps y qué venderle — y armarle la propuesta en un toque.</div>
+          <div class="detail" id="detail" style="display:none"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ EMBUDO ════════ -->
+    <section class="view" id="view-embudo">
+      <div class="stat-grid" id="embStats"></div>
+      <div class="board" id="board"></div>
+      <p class="wanote" style="margin-top:10px;">Arrastrá tarjetas entre etapas (o ◀ ▶ en el teléfono). Mismo tablero y datos que la app EMBUDO clásica — todo se guarda en este navegador.</p>
+    </section>
+
+    <!-- ════════ PROPUESTA ════════ -->
+    <section class="view" id="view-propuesta">
+      <div class="prop-cols">
+        <aside class="editor">
+          <div class="grp">
+            <div class="gl">Cliente</div>
+            <div class="fld"><label>Cargar lead</label><select id="pBiz"><option value="">— a mano —</option></select></div>
+            <div class="fld"><label>Negocio</label><input id="pNeg" placeholder="Panadería La Tradición"></div>
+            <div class="row2">
+              <div class="fld"><label>Ciudad</label><input id="pCiu"></div>
+              <div class="fld"><label>A la atención de</label><input id="pAt" placeholder="Dueño/a"></div>
+            </div>
+          </div>
+          <div class="grp"><div class="gl">Servicios</div><div id="pSvcList"></div></div>
+          <div class="grp"><div class="gl">Diagnóstico (editable)</div>
+            <div class="fld"><textarea id="pDiag" rows="4" placeholder="Se autoarma con los gaps del lead y los servicios elegidos; editalo a gusto."></textarea></div></div>
+          <div class="grp"><div class="gl">Condiciones</div>
+            <div class="row2">
+              <div class="fld"><label>Seña %</label><input id="pSena" type="number" value="50" min="0" max="100"></div>
+              <div class="fld"><label>Validez (días)</label><input id="pValid" type="number" value="15" min="1"></div>
+            </div>
+            <div class="fld"><label>Moneda</label><select id="pMon"><option>US$</option><option>AR$</option><option>€</option><option>$</option></select></div>
+          </div>
+          <div class="grp"><div class="gl">Tu marca</div>
+            <div class="fld"><label>Nombre</label><input id="pMarca"></div>
+            <div class="fld"><label>Contacto (pie)</label><input id="pCont"></div>
+          </div>
+          <div id="prop-actions">
+            <button class="btn pri" id="printBtn" style="width:100%;">🖨 Imprimir / PDF</button>
+            <div class="btnrow">
+              <button class="btn" id="copyPropBtn">📋 Texto</button>
+              <button class="btn" id="savePropBtn">💾 Guardar</button>
+              <button class="btn danger" id="clearPropBtn">↺</button>
+            </div>
+          </div>
+        </aside>
+        <div>
+          <div class="doc" id="doc"></div>
+          <div class="seclabel">Propuestas guardadas</div>
+          <div class="hist" id="propHist"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ CATÁLOGO ════════ -->
+    <section class="view" id="view-catalogo">
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+        <button class="btn" id="editPricesBtn">✎ Editar precios</button>
+        <button class="btn" id="resetPricesBtn">↺ Reset</button>
+        <span class="wanote" style="margin:0;">Los precios editados se comparten con PIPELINES, PROPUESTA y GUÍA (misma clave local).</span>
+      </div>
+      <div class="cat-grid" id="catGrid"></div>
+    </section>
+
+    <!-- ════════ GUÍA ════════ -->
+    <section class="view" id="view-guia">
+      <div class="seclabel" style="margin-top:0">El proceso · de desconocido a cliente</div>
+      <div class="steps" id="gSteps"></div>
+      <div class="seclabel">Reglas de oro</div>
+      <div class="rules" id="gRules"></div>
+      <div class="seclabel">Guión por servicio</div>
+      <div class="svcsel" id="gSel"></div>
+      <div id="gGuide"></div>
+    </section>
+  </main>
+
+  <p class="note">
+    <b>ZETA LABS</b> une AUDITORÍA + PIPELINES + PROPUESTA + EMBUDO + GUÍA alrededor de una sola
+    entidad: el lead. Los datos de presencia digital vienen del relevamiento manual de la
+    Auditoría (Firebase público si está activo, o el seed local); nada se detecta ni se publica
+    solo. Precios, embudo y propuestas viven en este navegador y son compatibles con las apps
+    clásicas de LABS. Esta app no cobra, no escribe Firebase y no envía nada: el envío de una
+    propuesta al cliente lo hacés vos (imprimir/PDF o copiar texto).
+  </p>
+  <div class="foot">HUMAN GLITCHE · ZETA LABS · destino: labs.hg-vl.com (publicación pendiente de aprobación)</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'),1800); }
+
+// ════════════════════════════════════════════════════════════════════════════
+// CATÁLOGO — mismo contenido y defaults que PIPELINES (fuente de verdad UI)
+// ════════════════════════════════════════════════════════════════════════════
+const PIPELINES=[
+  { id:'web', ico:'🌐', name:'PRESENCIA WEB', tag:'sitio · landing',
+    desc:'Que el negocio exista en internet: un sitio simple que carga rápido y aparece en Google. La base de todo lo demás.',
+    incluye:'Un sitio propio que carga rápido y aparece en Google — con tus fotos, horarios, ubicación y botón de WhatsApp.',
+    gap:['web'], tipos:[],
+    nodes:['Dominio','Plantilla HG','Contenido + fotos','Deploy (Pages)','SEO básico','Ficha Google'],
+    setup:{costo:40, precio:200}, mensual:{costo:6, precio:30} },
+  { id:'wa', ico:'💬', name:'WHATSAPP BIZ AUTOPILOT', tag:'whatsapp · bot',
+    desc:'WhatsApp Business con catálogo, respuestas automáticas a las preguntas de siempre, etiquetas y recordatorios. El canal donde realmente compran.',
+    incluye:'WhatsApp Business con catálogo y respuestas automáticas a las preguntas de siempre. El canal donde realmente se vende, ordenado.',
+    gap:['wa'], tipos:[],
+    nodes:['WhatsApp Business','Catálogo','Bot de FAQ','Etiquetas / CRM','Recordatorios','Aviso al dueño'],
+    setup:{costo:25, precio:150}, mensual:{costo:14, precio:70} },
+  { id:'social', ico:'📲', name:'REDES EN PILOTO', tag:'instagram · tiktok',
+    desc:'Contenido programado, respuestas automáticas a DM y un reporte mensual claro. Presencia constante sin vivir pegado al teléfono.',
+    incluye:'Contenido con tu estética, programado, y respuestas automáticas a mensajes. Presencia constante sin vivir en el teléfono.',
+    gap:['ig','tt'], tipos:[],
+    nodes:['Calendario','Contenido (motor-media)','Programación','Auto-DM','Hashtags','Reporte'],
+    setup:{costo:30, precio:160}, mensual:{costo:45, precio:200} },
+  { id:'menu', ico:'🍽️', name:'MENÚ + PEDIDOS WHATSAPP', tag:'gastro · retail',
+    desc:'Carta digital con QR en la mesa/vidriera: el cliente arma el pedido y cae directo a tu WhatsApp con seña opcional. Menos idas y vueltas, más tickets.',
+    incluye:'Carta digital con QR: el cliente arma el pedido y te llega directo al WhatsApp, con seña opcional. Sin comisión de apps.',
+    gap:[], tipos:['Restaurante','Cafetería','Bar','Panadería','Carnicería','Supermercado','Rotisería','Heladería','Pizzería','Tienda','Florería'],
+    nodes:['Menú/QR','Carrito','Pedido a WhatsApp','Confirmación','Seña / cobro','Aviso a cocina'],
+    setup:{costo:35, precio:180}, mensual:{costo:16, precio:80} },
+  { id:'leads', ico:'🧲', name:'CAPTURA DE LEADS', tag:'formulario · crm',
+    desc:'Un formulario que captura interesados y dispara seguimiento automático por mail/WhatsApp. Convierte visitas en contactos reales.',
+    incluye:'Un formulario que captura interesados y les hace seguimiento automático. Cada visita se vuelve un contacto con nombre y teléfono.',
+    gap:[], reqWeb:true, tipos:['Inmobiliaria','Agencia de viajes','Hotel','Contabilidad','Gimnasio'],
+    nodes:['Formulario','Sheet / CRM','Email/WA automático','Seguimiento','Aviso al dueño'],
+    setup:{costo:22, precio:120}, mensual:{costo:9, precio:50} },
+  { id:'resenas', ico:'⭐', name:'REPUTACIÓN', tag:'reseñas · google',
+    desc:'Pide reseñas a los clientes contentos y te avisa de las negativas antes de que escalen. Sube la nota y la confianza.',
+    incluye:'Pide reseñas a los clientes contentos y te avisa de las negativas antes de que escalen. Tu nota en Google, en alza.',
+    gap:[], tipos:['Restaurante','Hotel','Mecánica','Cafetería','Odontología','Veterinaria'],
+    nodes:['Post-venta','Mensaje WA/Email','Link a reseña','Filtro NPS','Alerta negativas'],
+    setup:{costo:16, precio:90}, mensual:{costo:7, precio:45} },
+  { id:'turnos', ico:'📆', name:'AGENDA / TURNOS', tag:'reservas · recordatorios',
+    desc:'Link de reserva con confirmación y recordatorio automático 24h antes. Menos turnos perdidos, agenda ordenada.',
+    incluye:'Reservas online con confirmación y recordatorio 24 h antes. Menos turnos perdidos y la agenda ordenada.',
+    gap:[], tipos:['Peluquería','Barbería','Estética','Spa','Consultorio','Estudio','Taller','Profesional','Veterinaria','Odontología','Kinesiología','Gimnasio','Óptica','Mecánica'],
+    nodes:['Link de reserva','Calendario','Confirmación WA','Recordatorio 24h','Reprogramación'],
+    setup:{costo:22, precio:130}, mensual:{costo:10, precio:55} },
+  { id:'factura', ico:'🧾', name:'FACTURACIÓN AUTO', tag:'fiscal · arca',
+    desc:'De la venta al comprobante sin fricción: arma la factura AR (A/B/C), la envía por mail/WhatsApp y la registra. Cierra el círculo administrativo.',
+    incluye:'De la venta al comprobante sin doble carga: factura A/B/C armada, enviada y registrada.',
+    gap:[], tipos:['Mecánica','Contabilidad','Inmobiliaria','Profesional','Electrónica','Ropa'],
+    nodes:['Venta','Datos cliente','Factura AR','Envío email/WA','Registro'],
+    setup:{costo:26, precio:140}, mensual:{costo:11, precio:60} },
+  { id:'tienda', ico:'🛒', name:'TIENDA + PAGOS', tag:'catálogo · mercado pago',
+    desc:'Catálogo online con carrito y cobro por Mercado Pago: el cliente elige, paga y el pedido llega cobrado. Canal propio, sin comisión de marketplace.',
+    incluye:'Tu catálogo online con carrito y cobro por Mercado Pago. El pedido te llega ya cobrado, sin comisión de marketplace.',
+    gap:[], tipos:['Tienda','Ropa','Electrónica','Ferretería','Librería','Juguetería','Deportes','Bazar','Regalería','Vivero','Florería','Panadería'],
+    nodes:['Catálogo','Carrito','Mercado Pago','Confirmación','Envío / retiro','Registro ventas'],
+    setup:{costo:45, precio:240}, mensual:{costo:12, precio:60} },
+  { id:'ads', ico:'📣', name:'PUBLICIDAD LOCAL', tag:'meta ads · google',
+    desc:'Campañas en Instagram/Google segmentadas al barrio, con piezas propias y reporte claro: cuánto pusiste, cuánta gente vino. La pauta la paga el cliente aparte.',
+    incluye:'Campañas en Instagram y Google apuntadas a tu zona, con piezas propias y un reporte claro de cada peso invertido. (La pauta la pagás aparte.)',
+    gap:[], tipos:['Gimnasio','Inmobiliaria','Restaurante','Estética','Hotel','Academia','Agencia de viajes','Pizzería'],
+    nodes:['Objetivo','Pieza (motor-media)','Segmentación local','Campaña Meta/Google','Optimización','Reporte'],
+    setup:{costo:25, precio:140}, mensual:{costo:40, precio:180} },
+  { id:'email', ico:'💌', name:'EMAIL + FIDELIZACIÓN', tag:'newsletter · cupones',
+    desc:'Base de clientes con newsletter, cupones y saludo de cumpleaños automático. Hacer volver al que ya compró cuesta 5 veces menos que conseguir uno nuevo.',
+    incluye:'Base de clientes con newsletter, cupones y saludo de cumpleaños automático. Hacer volver al que ya te compró.',
+    gap:[], tipos:['Restaurante','Cafetería','Peluquería','Tienda','Gimnasio','Librería','Heladería','Barbería','Estética'],
+    nodes:['Alta QR / form','Base de clientes','Newsletter','Cupones','Cumpleaños auto','Métricas'],
+    setup:{costo:18, precio:100}, mensual:{costo:10, precio:50} },
+  { id:'brand', ico:'🎨', name:'IDENTIDAD VISUAL', tag:'logo · paleta · plantillas',
+    desc:'Logo, paleta, tipografías y plantillas para redes: que todo lo del negocio se vea de la misma casa. Pago único — el pack queda para siempre.',
+    incluye:'Logo, paleta, tipografías y plantillas para redes: que todo tu negocio se vea de la misma casa. Queda tuyo para siempre.',
+    gap:[], tipos:[],
+    nodes:['Brief','Logo (LETRAS)','Paleta (PALETA)','Tipografías (TIPOS)','Plantillas redes','Manual mini'],
+    setup:{costo:35, precio:220}, mensual:{costo:0, precio:0} },
+  { id:'video', ico:'🎬', name:'PACK VIDEO / REELS', tag:'reels · contenido',
+    desc:'Pack mensual de videos cortos filmados y editados con estética propia. Las redes hoy son video: el que no publica reels no existe para el algoritmo.',
+    incluye:'Pack mensual de videos cortos filmados y editados con estética propia. Lo único que el algoritmo muestra gratis hoy.',
+    gap:[], tipos:['Restaurante','Ropa','Gimnasio','Estética','Bar','Heladería','Tienda','Cafetería','Barbería'],
+    nodes:['Guion','Rodaje / captura','Edición (motor-media)','Formatos 9:16','Publicación','Reporte'],
+    setup:{costo:20, precio:120}, mensual:{costo:55, precio:250} },
+];
+const BY_ID=Object.fromEntries(PIPELINES.map(p=>[p.id,p]));
+const CHANNELS=[{k:'web',t:'Web'},{k:'ig',t:'Instagram'},{k:'fb',t:'Facebook'},{k:'wa',t:'WhatsApp'},{k:'tt',t:'TikTok'}];
+const ETAPAS=[
+  {k:'prospecto', t:'Prospecto', c:'#6b6656'},
+  {k:'contactado', t:'Contactado', c:'#3ad0ff'},
+  {k:'propuesta', t:'Propuesta', c:'#b8ff00'},
+  {k:'cerrado', t:'Cerrado', c:'#1fbf5a'},
+  {k:'perdido', t:'Perdido', c:'#ff2d55'},
+];
+const EK=ETAPAS.map(e=>e.k);
+const ETAPA_BY=Object.fromEntries(ETAPAS.map(e=>[e.k,e]));
+
+// ════════════════════════════════════════════════════════════════════════════
+// ESTADO + PERSISTENCIA (claves compatibles con las apps clásicas de LABS)
+// ════════════════════════════════════════════════════════════════════════════
+const LS_PRICE='hg_pipelines_precios', LS_MON='hg_pipelines_moneda',
+      LS_EMB='hg_embudo_v1', LS_FAV='hg_aud_favs',
+      LS_PROPS='hg_zeta_propuestas', LS_CFG='hg_zeta_cfg',
+      LS_SCANS='hg_zeta_scans', LS_LOCAL='hg_zeta_leads_local',
+      GKEY_LS='hg_gmaps_key';
+
+// Worker de detección de redes (mismo que usa la Auditoría — ya desplegado).
+// Escanea la web del negocio server-side y devuelve ig/fb/wa/tt + evidencia +
+// contactos. Acá el resultado se guarda SOLO en este navegador (hg_zeta_scans):
+// asentarlo en la Auditoría sigue siendo del panel de moderación (gate).
+const REDES_WORKER_URL='https://hg-redes-scan.tukyquilme.workers.dev';
+
+// 25 ciudades PBA — sugerencias del datalist y atajo de coords sin red
+// (mismas que la Auditoría; cualquier otro lugar se resuelve vía Nominatim).
+const CITIES={
+  'La Plata':{lat:-34.921,lng:-57.954},'Mar del Plata':{lat:-38.005,lng:-57.542},'Bahía Blanca':{lat:-38.719,lng:-62.269},
+  'Quilmes':{lat:-34.724,lng:-58.253},'Tandil':{lat:-37.321,lng:-59.133},'San Nicolás':{lat:-33.336,lng:-60.226},
+  'Zárate':{lat:-34.098,lng:-59.029},'Olavarría':{lat:-36.892,lng:-60.322},'Junín':{lat:-34.588,lng:-60.945},
+  'Pergamino':{lat:-33.890,lng:-60.573},'Azul':{lat:-36.779,lng:-59.858},'Necochea':{lat:-38.554,lng:-58.737},
+  'Luján':{lat:-34.570,lng:-59.102},'Campana':{lat:-34.163,lng:-58.957},'San Pedro':{lat:-33.679,lng:-59.667},
+  'Tres Arroyos':{lat:-38.376,lng:-60.272},'Pehuajó':{lat:-35.851,lng:-61.899},'Chivilcoy':{lat:-34.896,lng:-60.016},
+  'Bragado':{lat:-35.119,lng:-60.491},'Lobos':{lat:-35.185,lng:-59.091},'Chascomús':{lat:-35.573,lng:-58.012},
+  'Dolores':{lat:-36.313,lng:-57.683},'Pilar':{lat:-34.458,lng:-58.914},'Mercedes':{lat:-34.651,lng:-59.431},
+  'Saladillo':{lat:-35.638,lng:-59.780}
+};
+const PLACE_TYPE_MAP={
+  bakery:'Panadería', restaurant:'Restaurante', cafe:'Café', bar:'Bar',
+  clothing_store:'Indumentaria', shoe_store:'Zapatería', jewelry_store:'Joyería',
+  hair_care:'Peluquería', beauty_salon:'Estética', spa:'Spa',
+  pharmacy:'Farmacia', supermarket:'Supermercado', grocery_or_supermarket:'Almacén/Supermercado',
+  hardware_store:'Ferretería', furniture_store:'Mueblería', electronics_store:'Electrónica',
+  book_store:'Librería', florist:'Florería', car_repair:'Taller mecánico',
+  gym:'Gimnasio', bicycle_store:'Bicicletería', pet_store:'Petshop', laundry:'Lavandería'
+};
+
+let BIZ={};                    // leads relevados (Firebase/seed) id → biz
+let funnel=[];                 // cards embudo {id,name,city,type,stage,tags[],next,due,val,notes}
+let props=[];                  // propuestas guardadas
+let priceOv={}, moneda='US$';
+let favs=new Set();
+let cfg={ marca:'Human Glitche', cont:'hola@hg-vl.com · hg-vl.com', sena:50, valid:15 };
+let editPrices=false;
+let scans={};                  // resultados del Worker por id de lead (solo este navegador)
+let localLeads={};             // leads sumados desde la búsqueda Google (solo este navegador)
+
+try{ priceOv=JSON.parse(localStorage.getItem(LS_PRICE)||'{}')||{}; }catch(e){}
+try{ moneda=localStorage.getItem(LS_MON)||'US$'; }catch(e){}
+try{ const s=JSON.parse(localStorage.getItem(LS_EMB)||'null'); if(Array.isArray(s)) funnel=s; }catch(e){}
+try{ favs=new Set(JSON.parse(localStorage.getItem(LS_FAV)||'[]')); }catch(e){}
+try{ const s=JSON.parse(localStorage.getItem(LS_PROPS)||'null'); if(Array.isArray(s)) props=s; }catch(e){}
+try{ const s=JSON.parse(localStorage.getItem(LS_CFG)||'null'); if(s) cfg=Object.assign(cfg,s); }catch(e){}
+try{ const s=JSON.parse(localStorage.getItem(LS_SCANS)||'null'); if(s) scans=s; }catch(e){}
+try{ const s=JSON.parse(localStorage.getItem(LS_LOCAL)||'null'); if(s) localLeads=s; }catch(e){}
+
+const saveEmb=()=>{ try{ localStorage.setItem(LS_EMB,JSON.stringify(funnel)); }catch(e){} };
+const saveScans=()=>{ try{ localStorage.setItem(LS_SCANS,JSON.stringify(scans)); }catch(e){} };
+const saveLocal=()=>{ try{ localStorage.setItem(LS_LOCAL,JSON.stringify(localLeads)); }catch(e){} };
+const getGKey=()=>{ try{ return localStorage.getItem(GKEY_LS)||''; }catch(e){ return ''; } };
+const setGKey=v=>{ try{ localStorage.setItem(GKEY_LS,v); }catch(e){} };
+const saveProps=()=>{ try{ localStorage.setItem(LS_PROPS,JSON.stringify(props)); }catch(e){} };
+const savePrice=()=>{ try{ localStorage.setItem(LS_PRICE,JSON.stringify(priceOv)); }catch(e){} };
+const saveCfg=()=>{ try{ localStorage.setItem(LS_CFG,JSON.stringify(cfg)); }catch(e){} };
+const saveFavs=()=>{ try{ localStorage.setItem(LS_FAV,JSON.stringify([...favs])); }catch(e){} };
+const uid=()=>'c'+Math.random().toString(36).slice(2,9);
+const num=(v,d)=>(typeof v==='number'&&!isNaN(v))?v:d;
+const money=n=>moneda+' '+Math.round(n).toLocaleString('es-AR');
+function P(id){
+  const d=BY_ID[id], o=priceOv[id]||{};
+  return {
+    setup:{ costo:num(o.setup&&o.setup.costo,d.setup.costo), precio:num(o.setup&&o.setup.precio,d.setup.precio) },
+    mensual:{ costo:num(o.mensual&&o.mensual.costo,d.mensual.costo), precio:num(o.mensual&&o.mensual.precio,d.mensual.precio) }
+  };
+}
+const fkey=(name,city)=>((name||'').trim().toLowerCase()+'|'+(city||'').trim().toLowerCase());
+// Lead + resultado de escaneo local fusionados. Solo POSITIVOS: un escaneo
+// nunca baja un flag confirmado ni afirma ausencia (regla de la Auditoría).
+function mergedBiz(id,b){
+  const m={id,...b}, s=scans[id];
+  if(!s) return m;
+  if(s.alive===true) m.web=true;
+  for(const k of ['ig','fb','wa','tt']) if(s[k]===true) m[k]=true;
+  if(s.contacts) for(const k of ['igUrl','fbUrl','ttUrl','waPhone','email']) if(s.contacts[k]&&!m[k]) m[k]=s.contacts[k];
+  return m;
+}
+function getBiz(id){ const b=BIZ[id]; return b?mergedBiz(id,b):null; }
+function mergeLocalLeads(){ for(const [id,b] of Object.entries(localLeads)) BIZ[id]=b; }
+function funnelCardFor(b){ const k=fkey(b.name,b.city); return funnel.find(c=>fkey(c.name,c.city)===k); }
+function scoreOf(b){ let n=0; CHANNELS.forEach(c=>{ if(b[c.k]===true) n++; }); return n; }
+function waLink(phone,text){
+  let d=String(phone||'').replace(/\D/g,'');
+  if(!d) return '';
+  if(d.startsWith('0')) d=d.slice(1);
+  if(!d.startsWith('54')) d='54'+d;
+  return 'https://wa.me/'+d+(text?'?text='+encodeURIComponent(text):'');
+}
+function fmtDue(due){ if(!due) return null; const d=new Date(due+'T00:00:00'); const t=new Date(); t.setHours(0,0,0,0);
+  const diff=Math.round((d-t)/86400000);
+  return { txt: diff===0?'hoy':diff<0?('hace '+(-diff)+'d'):('en '+diff+'d'), overdue:diff<0, soon:diff>=0&&diff<=1 };
+}
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(ts){ return new Date(ts).toLocaleDateString('es-AR',{day:'2-digit',month:'short'}); }
+
+// ════════════════════════════════════════════════════════════════════════════
+// DIAGNÓSTICO / RECOMENDACIÓN — mismo motor que PIPELINES
+// ════════════════════════════════════════════════════════════════════════════
+function recoFor(p,b){
+  if(!b) return {rec:false,reason:''};
+  const r=reason=>({rec:true,reason});
+  const type=(b.type||'').toLowerCase();
+  const typeMatch=p.tipos&&p.tipos.some(t=>type.includes(t.toLowerCase()));
+  switch(p.id){
+    case 'web':   if(b.web===false) return r('No tiene web'); break;
+    case 'wa':    if(b.wa===false)  return r('Sin WhatsApp Business'); break;
+    case 'social':
+      if(b.ig===false&&b.tt===false) return r('Casi sin redes');
+      if(b.ig===false) return r('Sin Instagram');
+      if(b.tt===false) return r('Sin TikTok');
+      break;
+    case 'menu':  if(typeMatch) return r('Vende comida/productos'); break;
+    case 'leads': if(typeMatch) return r('Vive de consultas'); if(b.web===true) return r('Ya tiene web: captá leads'); break;
+    case 'resenas':
+      if(typeof b.rating==='number'&&b.rating<4.0) return r('Calificación baja (★'+b.rating+')');
+      if(typeof b.reviews==='number'&&b.reviews<50) return r('Pocas reseñas');
+      if(typeMatch) return r('La reputación le vende');
+      break;
+    case 'turnos':  if(typeMatch) return r('Trabaja con turnos'); break;
+    case 'factura': if(typeMatch) return r('Factura seguido'); break;
+    case 'tienda':  if(typeMatch) return r('Vende productos'); break;
+    case 'ads':     if(typeMatch) return r('Compite en su zona'); break;
+    case 'email':   if(typeMatch) return r('Clientes que vuelven'); break;
+    case 'brand':   if(b.web===false&&b.ig===false) return r('Arranca de cero: identidad primero'); break;
+    case 'video':   if(typeMatch&&(b.ig===true||b.tt===true)) return r('Redes activas piden video'); break;
+  }
+  if(typeMatch) return r('Ideal para '+(b.type||'el rubro'));
+  return {rec:false,reason:''};
+}
+function recosOf(b){ return PIPELINES.map(p=>({p,...recoFor(p,b)})).filter(x=>x.rec); }
+
+// ════════════════════════════════════════════════════════════════════════════
+// CARGA DE LEADS — misma cadena que PIPELINES (Firebase → seed → fallback)
+// ════════════════════════════════════════════════════════════════════════════
+const FALLBACK={
+  demo_a:{name:'Panadería La Tradición', type:'Panadería', city:'La Plata', web:false, ig:false, fb:true, wa:false, tt:false, rating:4.7, reviews:312, phone:'0221 507-3002'},
+  demo_b:{name:'Barbería Norte', type:'Barbería', city:'Quilmes', web:false, ig:true, fb:false, wa:false, tt:false, rating:4.4, reviews:88},
+  demo_c:{name:'Estudio Contable Méndez', type:'Profesional', city:'Mar del Plata', web:true, ig:false, fb:false, wa:true, tt:false, rating:4.9, reviews:21},
+  demo_d:{name:'Veterinaria Patitas', type:'Veterinaria', city:'Tandil', web:false, ig:true, fb:true, wa:true, tt:false, rating:4.6, reviews:140},
+};
+async function loadBiz(){
+  const PATHS=['https://hg-vl-shaders-default-rtdb.firebaseio.com/comercios.json','/seed_comercios_pba.json','/auditoria/seed_comercios_pba.json','../auditoria/seed_comercios_pba.json','seed_comercios_pba.json'];
+  for(const path of PATHS){
+    try{
+      const r=await fetch(path,{cache:'no-store'});
+      if(!r.ok) continue;
+      const d=await r.json();
+      const obj=(d&&typeof d==='object'&&!Array.isArray(d))?d:{};
+      if(!Object.keys(obj).length) continue;
+      BIZ=obj; mergeLocalLeads(); return;
+    }catch(e){}
+  }
+  BIZ={...FALLBACK}; mergeLocalLeads();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// NAVEGACIÓN
+// ════════════════════════════════════════════════════════════════════════════
+let curView='pulso';
+function show(view){
+  curView=view;
+  document.querySelectorAll('main section.view').forEach(s=>s.classList.toggle('on', s.id==='view-'+view));
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on', b.getAttribute('data-view')===view));
+  if(view==='pulso') renderPulso();
+  if(view==='leads') renderLeads();
+  if(view==='embudo') renderBoard();
+  if(view==='propuesta'){ renderPropEditor(); renderDoc(); renderPropHist(); }
+  if(view==='catalogo') renderCat();
+  if(view==='guia') renderGuiaAll();
+  window.scrollTo({top:0});
+}
+$('tabs').addEventListener('click',e=>{
+  const b=e.target.closest('[data-view]'); if(!b) return; show(b.getAttribute('data-view'));
+});
+function refreshCounts(){
+  $('cnt-leads').textContent=Object.keys(BIZ).length;
+  $('cnt-embudo').textContent=funnel.length;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PULSO
+// ════════════════════════════════════════════════════════════════════════════
+function renderPulso(){
+  const bizArr=Object.entries(BIZ).map(([id,b])=>({id,...b}));
+  const opps=bizArr.filter(b=>scoreOf(b)<=2).length;
+  const counts=Object.fromEntries(EK.map(k=>[k,funnel.filter(c=>c.stage===k).length]));
+  const enviadas=props.filter(p=>p.estado!=='borrador').length;
+  const aceptadas=props.filter(p=>p.estado==='aceptada').length;
+  const valSetup=props.filter(p=>p.estado==='enviada').reduce((a,p)=>a+(p.setup||0),0);
+  const valMens=props.filter(p=>p.estado==='aceptada').reduce((a,p)=>a+(p.mensual||0),0);
+  const cerrados=counts.cerrado, decididos=counts.cerrado+counts.perdido;
+  const tasa=decididos?Math.round(cerrados/decididos*100):null;
+  $('pulsoStats').innerHTML=`
+    <div class="stat"><div class="l">Leads relevados</div><div class="v v-acid">${bizArr.length}</div></div>
+    <div class="stat"><div class="l">Oportunidades (salud ≤2/5)</div><div class="v v-gold">${opps}</div></div>
+    <div class="stat"><div class="l">En embudo</div><div class="v v-cyan">${funnel.length}</div></div>
+    <div class="stat"><div class="l">Propuestas enviadas</div><div class="v v-violet">${enviadas}</div></div>
+    <div class="stat"><div class="l">Valor propuesto (setup)</div><div class="v v-acid">${valSetup?money(valSetup):'—'}</div></div>
+    <div class="stat"><div class="l">Mensual ganado</div><div class="v v-ok">${valMens?money(valMens)+'<small>/mes</small>':'—'}</div></div>
+    <div class="stat"><div class="l">Cerrados</div><div class="v v-ok">${cerrados}</div></div>
+    <div class="stat"><div class="l">Tasa de cierre</div><div class="v ${tasa===null?'':'v-acid'}">${tasa===null?'—':tasa+'%'}</div></div>`;
+  const max=Math.max(1,...EK.map(k=>counts[k]));
+  $('funnelBars').innerHTML=ETAPAS.map(e=>`
+    <div class="fb-row" data-goembudo="1">
+      <span class="fn">${e.t}</span>
+      <div class="fb-track"><div class="fb-fill" style="width:${counts[e.k]/max*100}%;background:${e.c}"></div></div>
+      <span class="fc">${counts[e.k]}</span>
+    </div>`).join('');
+  // próximas acciones: cards con next/due, vencidas primero
+  const acts=funnel.filter(c=>c.next||c.due).map(c=>({c,due:fmtDue(c.due)}))
+    .sort((a,b)=>{
+      const av=a.due?new Date(a.c.due).getTime():Infinity, bv=b.due?new Date(b.c.due).getTime():Infinity;
+      return av-bv;
+    }).slice(0,8);
+  $('nextActions').innerHTML=acts.length?acts.map(({c,due})=>`
+    <div class="prow ${due&&due.overdue?'due':''}" data-goembudo="1">
+      <div class="pn"><b>${esc(c.name)}</b><small>${esc([c.type,c.city].filter(Boolean).join(' · '))} · ${esc((ETAPA_BY[c.stage]||{}).t||c.stage)}</small></div>
+      <div class="px">${c.next?'→ '+esc(c.next):''}${due?'<br>'+esc(due.txt):''}</div>
+    </div>`).join(''):`<div class="empty">Sin próximas acciones cargadas. Definilas en la ficha de cada lead o en el embudo.</div>`;
+  // hot leads: peor salud, sin card de embudo
+  const hot=bizArr.filter(b=>!funnelCardFor(b)).map(b=>({b,s:scoreOf(b)}))
+    .sort((a,c)=>a.s-c.s || (c.b.reviews||0)-(a.b.reviews||0)).slice(0,8);
+  $('hotLeads').innerHTML=hot.length?hot.map(({b,s})=>{
+    const missing=CHANNELS.filter(c=>b[c.k]===false).map(c=>c.t).join(', ');
+    return `<div class="prow" data-golead="${esc(b.id)}">
+      <div class="pn"><b>${esc(b.name)}</b><small>${esc([b.type,b.city].filter(Boolean).join(' · '))}</small></div>
+      <div class="px">salud ${s}/5<br><span style="color:var(--glitch)">${esc(missing||'—')}</span></div>
+    </div>`;
+  }).join(''):`<div class="empty">Todos los leads relevados ya están en el embudo. A trabajarlos 💪</div>`;
+}
+$('view-pulso').addEventListener('click',e=>{
+  const gl=e.target.closest('[data-golead]');
+  if(gl){ show('leads'); selectLead(gl.getAttribute('data-golead')); return; }
+  if(e.target.closest('[data-goembudo]')) show('embudo');
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// LEADS
+// ════════════════════════════════════════════════════════════════════════════
+let lFilter='all', lCity='', lType='', lSort='score', lQ='', lPage=1, selId=null;
+const PAGE=24;
+function bizList(){ return Object.entries(BIZ).map(([id,b])=>mergedBiz(id,b)); }
+function leadsFiltered(){
+  let list=bizList();
+  if(lCity) list=list.filter(b=>b.city===lCity);
+  if(lType) list=list.filter(b=>b.type===lType);
+  if(lQ){ const q=lQ.toLowerCase(); list=list.filter(b=>(b.name||'').toLowerCase().includes(q)||(b.type||'').toLowerCase().includes(q)||(b.city||'').toLowerCase().includes(q)); }
+  if(lFilter==='no-web') list=list.filter(b=>b.web===false);
+  if(lFilter==='no-social') list=list.filter(b=>b.ig===false&&b.fb===false&&b.tt===false);
+  if(lFilter==='fav') list=list.filter(b=>favs.has(b.id));
+  if(lFilter==='funnel') list=list.filter(b=>!!funnelCardFor(b));
+  if(lSort==='score') list.sort((a,b)=>scoreOf(a)-scoreOf(b)||(b.reviews||0)-(a.reviews||0));
+  if(lSort==='reviews') list.sort((a,b)=>(b.reviews||0)-(a.reviews||0));
+  if(lSort==='rating') list.sort((a,b)=>(b.rating||0)-(a.rating||0));
+  if(lSort==='name') list.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  return list;
+}
+function buildLeadSelectors(){
+  const cities=[...new Set(bizList().map(b=>b.city).filter(Boolean))].sort();
+  $('fCity').innerHTML='<option value="">Ciudad: todas</option>'+cities.map(c=>`<option${c===lCity?' selected':''}>${esc(c)}</option>`).join('');
+  const types=[...new Set(bizList().map(b=>b.type).filter(Boolean))].sort();
+  $('fType').innerHTML='<option value="">Rubro: todos</option>'+types.map(t=>`<option${t===lType?' selected':''}>${esc(t)}</option>`).join('');
+}
+function renderLeads(){
+  buildLeadSelectors();
+  const list=leadsFiltered();
+  const pages=Math.max(1,Math.ceil(list.length/PAGE));
+  if(lPage>pages) lPage=pages;
+  const page=list.slice((lPage-1)*PAGE, lPage*PAGE);
+  document.querySelectorAll('.fchip').forEach(c=>c.classList.toggle('on', c.getAttribute('data-f')===lFilter));
+  $('leadGrid').innerHTML=page.length?page.map(b=>{
+    const s=scoreOf(b);
+    const card=funnelCardFor(b);
+    const st=card?ETAPA_BY[card.stage]:null;
+    const chips=CHANNELS.map(c=>{
+      const has=b[c.k]===true;
+      return `<span class="lch ${has?'has':'no'}">${c.t} ${has?'✓':'✗'}</span>`;
+    }).join('');
+    return `<div class="lcard${b.id===selId?' sel':''}" data-lead="${esc(b.id)}">
+      ${st?`<span class="stagepill" style="color:${st.c};border-color:${st.c}55;background:${st.c}18">${st.t}</span>`:''}
+      <div class="ln">${esc(b.name||b.id)}</div>
+      <div class="lm">${esc([b.type,b.city].filter(Boolean).join(' · '))}</div>
+      ${typeof b.rating==='number'?`<div class="lrate">★ ${b.rating}${b.reviews?' ('+b.reviews+')':''}</div>`:''}
+      <div class="lchips">${chips}</div>
+      <div class="scorebar"><i style="width:${s/5*100}%"></i></div>
+      <button class="fav-star${favs.has(b.id)?' on':''}" data-fav="${esc(b.id)}" title="Favorito">★</button>
+    </div>`;
+  }).join(''):`<div class="empty" style="grid-column:1/-1"><span class="ico">⌖</span>Ningún lead con esos filtros.</div>`;
+  $('leadPager').innerHTML=pages>1?`
+    <button class="btn sm" data-pg="-1" ${lPage<=1?'disabled':''}>◀</button>
+    <span>${lPage} / ${pages} · ${list.length} leads</span>
+    <button class="btn sm" data-pg="1" ${lPage>=pages?'disabled':''}>▶</button>`:(list.length?`<span>${list.length} leads</span>`:'');
+  renderDetail();
+}
+$('q').addEventListener('input',e=>{ lQ=e.target.value; lPage=1; renderLeads(); });
+$('fCity').addEventListener('change',e=>{ lCity=e.target.value; lPage=1; renderLeads(); });
+$('fType').addEventListener('change',e=>{ lType=e.target.value; lPage=1; renderLeads(); });
+$('fSort').addEventListener('change',e=>{ lSort=e.target.value; renderLeads(); });
+document.querySelectorAll('.fchip').forEach(c=>c.addEventListener('click',()=>{ lFilter=c.getAttribute('data-f'); lPage=1; renderLeads(); }));
+$('leadPager').addEventListener('click',e=>{ const b=e.target.closest('[data-pg]'); if(!b||b.disabled) return; lPage+=parseInt(b.getAttribute('data-pg'),10); renderLeads(); });
+$('leadGrid').addEventListener('click',e=>{
+  const f=e.target.closest('[data-fav]');
+  if(f){ const id=f.getAttribute('data-fav'); if(favs.has(id)) favs.delete(id); else favs.add(id); saveFavs(); renderLeads(); return; }
+  const c=e.target.closest('[data-lead]'); if(!c) return;
+  selectLead(c.getAttribute('data-lead'));
+});
+function selectLead(id){
+  selId=id; renderLeads();
+  if(window.innerWidth<=980){ $('detailWrap').scrollIntoView({behavior:'smooth'}); }
+}
+
+// detalle
+let detailSel={};  // pipeline ids tildados en el detalle
+function renderDetail(){
+  const b=getBiz(selId);
+  $('detailEmpty').style.display=b?'none':'block';
+  $('detail').style.display=b?'block':'none';
+  if(!b) return;
+  const s=scoreOf(b);
+  const recos=recosOf(b);
+  if(!detailSel.id||detailSel.id!==b.id){ detailSel={id:b.id, sel:new Set(recos.slice(0,3).map(x=>x.p.id))}; }
+  const card=funnelCardFor(b);
+  const others=PIPELINES.filter(p=>!recos.find(x=>x.p.id===p.id));
+  const recoHtml=x=>{
+    const pr=P(x.p.id);
+    const on=detailSel.sel.has(x.p.id);
+    return `<div class="reco${x.rec?' rec':''}">
+      <label><input type="checkbox" data-reco="${x.p.id}"${on?' checked':''}>
+        <span class="ri">${x.p.ico}</span>
+        <span class="rn">${esc(x.p.name)}<small class="${x.rec?'':'soft'}">${x.rec?'▲ '+esc(x.reason):'opcional'}</small></span>
+        <span class="rp">${money(pr.setup.precio)}${pr.mensual.precio>0?'<br>+'+money(pr.mensual.precio)+'/mes':''}</span>
+      </label>
+    </div>`;
+  };
+  const topReco=recos[0];
+  const guia=topReco?GUIA.find(g=>g.id===topReco.p.id):null;
+  const waMsg=guia?guia.wa.replace(/\[negocio\]/g,b.name||'tu negocio').replace(/\[ciudad\]/g,b.city||'tu ciudad'):'';
+  const waPhoneEf=b.phone||b.waPhone||'';
+  const wa=waPhoneEf?waLink(waPhoneEf,waMsg):'';
+  const nSel=detailSel.sel.size;
+  const scan=scans[b.id];
+  const isLocal=!!localLeads[b.id];
+  const scanBox=b.website?`
+    <div class="scanbox">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="btn sm" id="dScan">⚡ ${scan?'Re-escanear redes':'Escanear redes (su web)'}</button>
+        ${scan?`<span class="wanote" style="margin:0">escaneado ${fmtDate(scan.ts)}</span>`:''}
+      </div>
+      <div class="scanstatus" id="dScanStatus"></div>
+      ${scan?`<div class="sr">
+        ${scan.alive===false?'<span class="dead">web muerta ✗</span>':scan.alive===true?'<a href="'+esc(b.website)+'" target="_blank" rel="noopener">web viva ✓</a>':''}
+        ${scan.contacts&&scan.contacts.igUrl?'<a href="'+esc(scan.contacts.igUrl)+'" target="_blank" rel="noopener">IG ✓</a>':''}
+        ${scan.contacts&&scan.contacts.fbUrl?'<a href="'+esc(scan.contacts.fbUrl)+'" target="_blank" rel="noopener">FB ✓</a>':''}
+        ${scan.contacts&&scan.contacts.ttUrl?'<a href="'+esc(scan.contacts.ttUrl)+'" target="_blank" rel="noopener">TikTok ✓</a>':''}
+        ${scan.wa===true?(scan.contacts&&scan.contacts.waPhone?'<a href="'+esc(waLink(scan.contacts.waPhone))+'" target="_blank" rel="noopener">WA ✓ '+esc(scan.contacts.waPhone)+'</a>':'<a>WA ✓</a>'):''}
+        ${scan.contacts&&scan.contacts.email?'<a href="mailto:'+esc(scan.contacts.email)+'">✉ '+esc(scan.contacts.email)+'</a>':''}
+      </div>
+      <p class="wanote">Detección local escaneando su web (evidencia en los links). No escribe la Auditoría; y no encontrar una red en su web no prueba que no la tenga.</p>`:''}
+    </div>`
+    :`<p class="wanote">Sin web cargada — no hay qué escanear. Las redes de este lead se confirman a mano (o sumalo con web desde 🔎 Buscar negocios).</p>`;
+  $('detail').innerHTML=`
+    <h3>${esc(b.name||b.id)} ${isLocal?'<span class="localtag">LEAD LOCAL</span>':''}</h3>
+    <div class="dmeta"><b>${esc(b.type||'—')}</b>${b.city?' · '+esc(b.city):''}${typeof b.rating==='number'?` · ★ ${b.rating}${b.reviews?' ('+b.reviews+')':''}`:''}</div>
+    ${b.address?`<div class="dmeta">${esc(b.address)}</div>`:''}
+    ${waPhoneEf?`<div class="dmeta">☏ ${esc(waPhoneEf)}</div>`:''}
+    ${b.website?`<div class="dmeta">🌐 <a href="${esc(b.website)}" target="_blank" rel="noopener">${esc(b.website)}</a></div>`:''}
+    <div class="dscore">
+      <div class="t"><span>Salud digital</span><b>${s}/5</b></div>
+      <div class="scorebar" style="height:8px"><i style="width:${s/5*100}%"></i></div>
+    </div>
+    <div class="lchips" style="margin-bottom:4px">${CHANNELS.map(c=>`<span class="lch ${b[c.k]===true?'has':'no'}">${c.t} ${b[c.k]===true?'✓':'✗'}</span>`).join('')}</div>
+    ${scanBox}
+    <div class="d-actions">
+      ${wa?`<a class="btn" href="${esc(wa)}" target="_blank" rel="noopener">💬 WhatsApp con pitch</a>`:''}
+      <button class="btn pri" id="dToProp">📄 Armar propuesta (${nSel})</button>
+      ${card?'':'<button class="btn" id="dToFunnel">🫙 Al embudo</button>'}
+      ${isLocal?'<button class="btn sm danger" id="dDelLocal">✕ borrar lead local</button>':''}
+    </div>
+    ${wa&&topReco?`<p class="wanote">El botón de WhatsApp abre el chat con el primer mensaje de la guía para <b>${esc(topReco.p.name)}</b> ya escrito — revisalo antes de mandar.</p>`:''}
+    <div class="fl" style="margin-top:12px">Qué venderle — recomendados por sus gaps</div>
+    ${recos.map(recoHtml).join('')||'<p class="wanote">Sin recomendaciones automáticas: canales completos.</p>'}
+    <details style="margin-top:6px"><summary style="cursor:pointer;font-size:10px;color:var(--dim);font-family:'Space Mono',monospace;">+ resto del catálogo</summary>
+      <div style="margin-top:7px">${others.map(p=>recoHtml({p,rec:false,reason:''})).join('')}</div>
+    </details>
+    <div class="d-funnel">
+      <div class="fl">Seguimiento</div>
+      <div class="frow">
+        <div><label>Etapa</label><select id="dStage">
+          <option value="">— fuera del embudo —</option>
+          ${ETAPAS.map(e=>`<option value="${e.k}"${card&&card.stage===e.k?' selected':''}>${e.t}</option>`).join('')}
+        </select></div>
+        <div><label>Vence</label><input type="date" id="dDue" value="${card&&card.due?esc(card.due):''}"></div>
+      </div>
+      <div class="frow single"><div><label>Próxima acción</label><input id="dNext" value="${card?esc(card.next||''):''}" placeholder="llamar / pasar demo / mandar propuesta…"></div></div>
+      <div class="frow single"><div><label>Notas</label><textarea id="dNotes" rows="2">${card?esc(card.notes||''):''}</textarea></div></div>
+      <button class="btn" id="dSaveFunnel" style="width:100%">💾 Guardar seguimiento</button>
+    </div>`;
+  // eventos del detalle
+  $('detail').querySelectorAll('[data-reco]').forEach(cb=>cb.addEventListener('change',()=>{
+    const id=cb.getAttribute('data-reco');
+    if(cb.checked) detailSel.sel.add(id); else detailSel.sel.delete(id);
+    const btn=$('dToProp'); if(btn) btn.textContent='📄 Armar propuesta ('+detailSel.sel.size+')';
+  }));
+  const toProp=$('dToProp');
+  if(toProp) toProp.addEventListener('click',()=>{ startProposalFor(b,[...detailSel.sel]); });
+  const toFun=$('dToFunnel');
+  if(toFun) toFun.addEventListener('click',()=>{ ensureFunnelCard(b,'prospecto'); toast('Sumado al embudo como Prospecto'); renderDetail(); refreshCounts(); });
+  const sc=$('dScan');
+  if(sc) sc.addEventListener('click',()=>scanLead(b.id));
+  const dl=$('dDelLocal');
+  if(dl) dl.addEventListener('click',()=>{
+    if(!confirm('¿Borrar este lead local de este navegador? (no toca la Auditoría)')) return;
+    delete localLeads[b.id]; delete BIZ[b.id]; delete scans[b.id];
+    saveLocal(); saveScans(); selId=null; refreshCounts(); renderLeads(); toast('Lead local borrado');
+  });
+  const sv=$('dSaveFunnel');
+  if(sv) sv.addEventListener('click',()=>{
+    const stage=$('dStage').value;
+    let c=funnelCardFor(b);
+    if(!stage){
+      if(c){ funnel=funnel.filter(x=>x.id!==c.id); saveEmb(); toast('Sacado del embudo'); }
+    }else{
+      if(!c) c=ensureFunnelCard(b,stage);
+      c.stage=stage; c.next=$('dNext').value.trim(); c.due=$('dDue').value; c.notes=$('dNotes').value.trim();
+      saveEmb(); toast('Seguimiento guardado');
+    }
+    refreshCounts(); renderLeads();
+  });
+}
+function ensureFunnelCard(b,stage){
+  let c=funnelCardFor(b);
+  if(c) return c;
+  const recos=recosOf(b);
+  const val=recos.slice(0,3).reduce((a,x)=>a+P(x.p.id).setup.precio,0);
+  c={ id:uid(), name:b.name||'', city:b.city||'', type:b.type||'', stage:stage||'prospecto',
+      tags:recos.slice(0,3).map(x=>x.p.id), next:'', due:'', val:val?money(val):'', notes:'' };
+  funnel.push(c); saveEmb();
+  return c;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ESCANEO DE REDES — Worker hg-redes-scan (detección local, no escribe Firebase)
+// ════════════════════════════════════════════════════════════════════════════
+let scanRunning=false;
+async function scanLead(id){
+  const b=BIZ[id]; if(!b||!b.website||scanRunning) return;
+  scanRunning=true;
+  const st=$('dScanStatus');
+  if(st){ st.textContent='Escaneando '+b.website+'…'; st.className='scanstatus run'; }
+  try{
+    const r=await fetch(REDES_WORKER_URL+'?url='+encodeURIComponent(b.website),{cache:'no-store'});
+    if(!r.ok) throw new Error('el Worker respondió '+r.status);
+    const d=await r.json();
+    if(d.ok===false) throw new Error(d.error||'la web no respondió (timeout/DNS) — no prueba nada, probá de nuevo');
+    scans[id]={ ts:Date.now(), alive:d.alive, ig:d.ig, fb:d.fb, wa:d.wa, tt:d.tt, evidence:d.evidence||{}, contacts:d.contacts||{} };
+    saveScans();
+    // si es un lead local, asentar los positivos en su registro persistido
+    if(localLeads[id]){ localLeads[id]=({...localLeads[id],...(function(){const m=mergedBiz(id,localLeads[id]);delete m.id;return m;})()}); saveLocal(); }
+    const halladas=['ig','fb','wa','tt'].filter(k=>d[k]===true).map(k=>k.toUpperCase());
+    scanRunning=false;
+    renderLeads();
+    toast(d.alive===false?'La web no responde (muerta)':halladas.length?('Redes halladas: '+halladas.join(' · ')):'Web viva, sin redes linkeadas en su home');
+  }catch(e){
+    scanRunning=false;
+    if(st){ st.textContent='No se pudo escanear: '+e.message; st.className='scanstatus err'; }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// BUSCAR NEGOCIOS — Google Places, misma key y filosofía que la Auditoría:
+// 100% manual (nunca se dispara sola), cuota paga del usuario, resultados a
+// LEADS LOCALES de este navegador (la Auditoría pública se alimenta solo desde
+// su panel de moderación = gate). Al sumar: Place Details (web+tel, pago) y
+// escaneo de redes automático vía Worker si tiene web.
+// ════════════════════════════════════════════════════════════════════════════
+let gmapsInjected=false, placesService=null, _zResults=[], _zCity='';
+function ensureMaps(){
+  return new Promise((res,rej)=>{
+    if(window.google&&window.google.maps&&window.google.maps.places){ res(); return; }
+    if(!getGKey()){ rej(new Error('NOKEY')); return; }
+    if(gmapsInjected){ rej(new Error('Google Maps rechazó la clave anterior — guardá una válida (se recarga la página).')); return; }
+    let settled=false;
+    window.zetaMapsReady=()=>{ if(!settled){ settled=true; res(); } };
+    window.gm_authFailure=()=>{ if(!settled){ settled=true; rej(new Error('Google rechazó la clave de Maps. Borrala y pegá una válida.')); } };
+    const sc=document.createElement('script'); sc.async=true;
+    sc.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(getGKey())+'&libraries=places&callback=zetaMapsReady';
+    sc.onerror=()=>{ if(!settled){ settled=true; gmapsInjected=false; rej(new Error('No se pudo cargar el script de Google Maps.')); } };
+    setTimeout(()=>{ if(!settled&&!(window.google&&window.google.maps)){ settled=true; rej(new Error('Google Maps no contestó en 8 segundos.')); } },8000);
+    document.head.appendChild(sc); gmapsInjected=true;
+  });
+}
+function spStatus(msg,cls){ const el=$('spStatus'); el.textContent=msg||''; el.className='spstatus'+(cls?' '+cls:''); }
+function showKeyPrompt(){
+  $('spKey').innerHTML=`<div class="keyprompt">
+    La búsqueda usa Google Maps y necesita <b>tu clave</b> — la misma que usás en la Auditoría / Depo Zeta.
+    Se guarda en este dispositivo, nunca en el código ni en el repo.<br>
+    <input id="zkeyInput" type="password" placeholder="AIza…" value="${esc(getGKey())}">
+    <div style="display:flex;gap:7px;flex-wrap:wrap;">
+      <button class="btn sm" id="zkeySave">Guardar clave</button>
+      ${getGKey()?'<button class="btn sm danger" id="zkeyClear">Borrar clave de este equipo</button>':''}
+    </div>
+  </div>`;
+  $('zkeySave').addEventListener('click',()=>{
+    const v=($('zkeyInput').value||'').trim();
+    if(!v){ spStatus('Pegá una clave primero.','err'); return; }
+    setGKey(v); $('spKey').innerHTML='';
+    if(gmapsInjected){ location.reload(); return; }
+    doSearchPlaces();
+  });
+  const cl=$('zkeyClear');
+  if(cl) cl.addEventListener('click',()=>{ setGKey(''); showKeyPrompt(); });
+}
+async function geocodeLugar(q){
+  const url='https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q);
+  const ctrl=new AbortController(); const t=setTimeout(()=>ctrl.abort(),12000);
+  let res;
+  try{ res=await fetch(url,{headers:{'Accept':'application/json'},signal:ctrl.signal}); clearTimeout(t); }
+  catch(e){ throw new Error(e.name==='AbortError'?'Nominatim no respondió a tiempo.':'No se pudo conectar con Nominatim.'); }
+  const d=await res.json();
+  if(!d||!d.length) throw new Error('No se encontró "'+q+'" — probá con "barrio, ciudad".');
+  return { lat:parseFloat(d[0].lat), lng:parseFloat(d[0].lon), label:d[0].display_name };
+}
+async function resolveLugar(nombre){
+  const q=(nombre||'').trim();
+  if(!q) throw new Error('Escribí un lugar (ej. "Ensenada" o "Villa Elisa, La Plata").');
+  const known=Object.keys(CITIES).find(c=>c.toLowerCase()===q.toLowerCase());
+  if(known) return { name:known, lat:CITIES[known].lat, lng:CITIES[known].lng, label:known+' (ciudad conocida)' };
+  const g=await geocodeLugar(q);
+  return { name:q, lat:g.lat, lng:g.lng, label:g.label };
+}
+async function doSearchPlaces(){
+  $('spResults').innerHTML='';
+  try{ await ensureMaps(); }
+  catch(e){
+    if(e.message==='NOKEY'){ showKeyPrompt(); spStatus('Falta la clave de Google Maps.','err'); }
+    else spStatus(e.message,'err');
+    return;
+  }
+  if(!placesService) placesService=new google.maps.places.PlacesService(document.createElement('div'));
+  let lugar;
+  try{ spStatus('Ubicando el lugar…'); lugar=await resolveLugar($('spLugar').value); }
+  catch(e){ spStatus(e.message,'err'); return; }
+  _zCity=lugar.name;
+  const query=($('spQuery').value||'').trim()||'comercios';
+  spStatus('Buscando en Google Maps cerca de: '+lugar.label+'…');
+  const acc=[];
+  const handlePage=(results,status,pagination)=>{
+    if(status!==google.maps.places.PlacesServiceStatus.OK||!results||!results.length){
+      if(!acc.length) spStatus('Google Maps no encontró resultados (estado: '+status+').','err');
+      return;
+    }
+    acc.push(...results);
+    _zResults=acc; renderSearchResults();
+    if(pagination&&pagination.hasNextPage&&acc.length<60){
+      spStatus(acc.length+' resultados… trayendo más de Google (tope ~60).');
+      setTimeout(()=>pagination.nextPage(),2200);
+    }else{
+      spStatus(acc.length+' resultado(s) en '+_zCity+' — sumá los que sirvan (cada uno trae web+teléfono de Google y escanea sus redes solo).','ok');
+    }
+  };
+  placesService.textSearch({ query, location:new google.maps.LatLng(lugar.lat,lugar.lng), radius:6000 }, handlePage);
+}
+function guessType(r,query){
+  for(const t of (r.types||[])){ if(PLACE_TYPE_MAP[t]) return PLACE_TYPE_MAP[t]; }
+  const q=(query||'').trim();
+  return q&&q.toLowerCase()!=='comercios'?(q.charAt(0).toUpperCase()+q.slice(1)):'Comercio';
+}
+function renderSearchResults(){
+  const existing=new Set(bizList().map(b=>fkey(b.name,b.city)));
+  const fresh=_zResults.filter(r=>!existing.has(fkey(r.name,_zCity))).length;
+  $('spResults').innerHTML=`
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button class="btn sm" id="spAddAll" ${fresh?'':'disabled style="opacity:.4"'}>💾 Sumar todos (${fresh} nuevos)</button>
+      <span class="wanote" style="margin:0">cada "sumar" = 1 llamada paga de Place Details</span>
+    </div>`+_zResults.map((r,i)=>{
+    const dup=existing.has(fkey(r.name,_zCity));
+    return `<div class="spitem">
+      <div class="sn"><b>${esc(r.name||'(sin nombre)')}</b><small>📍 ${esc(r.formatted_address||'sin dirección')}${typeof r.rating==='number'?' · ★ '+r.rating+(r.user_ratings_total?' ('+r.user_ratings_total+')':''):''}</small></div>
+      ${dup?'<span class="dup">YA EN LA BASE</span>':''}
+      <button class="btn sm" data-spg="${i}">🔍 Google</button>
+      <button class="btn sm" data-spadd="${i}" id="spAdd-${i}" ${dup?'disabled style="opacity:.4"':''}>${dup?'ya existe':'＋ Sumar a mis leads'}</button>
+    </div>`;
+  }).join('');
+}
+function getPlaceDetails(placeId){
+  return new Promise(resolve=>{
+    if(!placeId||!placesService){ resolve({website:'',phone:''}); return; }
+    placesService.getDetails({ placeId, fields:['website','formatted_phone_number','international_phone_number'] },(place,status)=>{
+      if(status===google.maps.places.PlacesServiceStatus.OK&&place)
+        resolve({ website:place.website||'', phone:place.formatted_phone_number||place.international_phone_number||'' });
+      else resolve({website:'',phone:''});
+    });
+  });
+}
+async function addLocalLead(i,silent){
+  const r=_zResults[i]; if(!r) return false;
+  if(bizList().some(b=>fkey(b.name,b.city)===fkey(r.name,_zCity))) return false;
+  const details=await getPlaceDetails(r.place_id);
+  const loc=r.geometry&&r.geometry.location;
+  const rec={
+    name:r.name||'', type:guessType(r,$('spQuery').value), city:_zCity,
+    address:r.formatted_address||'', phone:details.phone||'', website:details.website||'',
+    web:!!details.website, ig:false, fb:false, wa:false, tt:false,
+    lat:loc?loc.lat():null, lng:loc?loc.lng():null,
+    rating:typeof r.rating==='number'?r.rating:null,
+    reviews:typeof r.user_ratings_total==='number'?r.user_ratings_total:null,
+    local:true, addedAt:Date.now(),
+    notes:'Lead local de ZETA LABS (búsqueda Google Maps). Nombre/dirección/rating/web/teléfono de Google; redes sin verificar salvo escaneo de su web.'
+  };
+  const id='local_'+uid();
+  localLeads[id]=rec; BIZ[id]=rec; saveLocal();
+  // cadena automática: si Google trajo web → el Worker detecta sus redes solo
+  if(rec.website){
+    try{
+      const wr=await fetch(REDES_WORKER_URL+'?url='+encodeURIComponent(rec.website),{cache:'no-store'});
+      if(wr.ok){
+        const d=await wr.json();
+        if(d.ok!==false){
+          scans[id]={ ts:Date.now(), alive:d.alive, ig:d.ig, fb:d.fb, wa:d.wa, tt:d.tt, evidence:d.evidence||{}, contacts:d.contacts||{} };
+          saveScans();
+          const m=mergedBiz(id,rec); delete m.id;
+          localLeads[id]=m; BIZ[id]=m; saveLocal();
+        }
+      }
+    }catch(e){ /* el escaneo nunca rompe el alta */ }
+  }
+  if(!silent){ refreshCounts(); renderLeads(); renderSearchResults(); toast('Sumado: '+rec.name+(scans[id]&&['ig','fb','wa','tt'].some(k=>scans[id][k])?' · redes detectadas ⚡':'')); }
+  return true;
+}
+$('spToggle').addEventListener('click',()=>{
+  const p=$('searchPanel');
+  const show=p.style.display==='none';
+  p.style.display=show?'block':'none';
+  if(show&&!$('zCities').options.length) $('zCities').innerHTML=Object.keys(CITIES).map(c=>`<option value="${esc(c)}">`).join('');
+});
+$('spGo').addEventListener('click',doSearchPlaces);
+$('spResults').addEventListener('click',async e=>{
+  const g=e.target.closest('[data-spg]');
+  if(g){ const r=_zResults[parseInt(g.getAttribute('data-spg'),10)];
+    if(r) window.open('https://www.google.com/search?q='+encodeURIComponent([r.name,_zCity].filter(Boolean).join(' ')),'_blank','noopener');
+    return; }
+  const a=e.target.closest('[data-spadd]');
+  if(a&&!a.disabled){
+    const i=parseInt(a.getAttribute('data-spadd'),10);
+    a.disabled=true; a.textContent='sumando…';
+    const ok=await addLocalLead(i,false);
+    if(!ok){ a.textContent='ya existe'; }
+    return;
+  }
+  const all=e.target.closest('#spAddAll');
+  if(all&&!all.disabled){
+    const existing=new Set(bizList().map(b=>fkey(b.name,b.city)));
+    const idx=_zResults.map((r,i)=>({r,i})).filter(({r})=>!existing.has(fkey(r.name,_zCity))).map(({i})=>i);
+    if(!idx.length) return;
+    if(!confirm('Sumar '+idx.length+' negocios = '+idx.length+' llamadas pagas de Place Details a tu cuenta de Google (más el escaneo de redes, gratis). ¿Dale?')) return;
+    all.disabled=true;
+    let done=0;
+    for(const i of idx){ await addLocalLead(i,true); done++; spStatus('Sumando '+done+'/'+idx.length+'…'); }
+    refreshCounts(); renderLeads(); renderSearchResults();
+    spStatus('Listo: '+done+' leads locales sumados (con redes escaneadas donde había web).','ok');
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// EMBUDO — kanban compatible con hg_embudo_v1
+// ════════════════════════════════════════════════════════════════════════════
+let dragId=null;
+function renderBoard(){
+  const valOf=c=>{ const m=String(c.val||'').replace(/[^\d]/g,''); return m?parseInt(m,10):0; };
+  const abiertos=funnel.filter(c=>c.stage!=='cerrado'&&c.stage!=='perdido');
+  const enJuego=abiertos.reduce((a,c)=>a+valOf(c),0);
+  $('embStats').innerHTML=`
+    <div class="stat"><div class="l">Tarjetas</div><div class="v v-acid">${funnel.length}</div></div>
+    <div class="stat"><div class="l">Abiertas</div><div class="v v-cyan">${abiertos.length}</div></div>
+    <div class="stat"><div class="l">Valor en juego</div><div class="v v-gold">${enJuego?money(enJuego):'—'}</div></div>
+    <div class="stat"><div class="l">Cerrados</div><div class="v v-ok">${funnel.filter(c=>c.stage==='cerrado').length}</div></div>`;
+  $('board').innerHTML=ETAPAS.map(e=>{
+    const list=funnel.filter(c=>c.stage===e.k);
+    return `<div class="col">
+      <div class="ch"><span><span class="dot" style="background:${e.c}"></span>${e.t}</span><span class="cc">${list.length}</span></div>
+      <div class="cards" data-stage="${e.k}">${list.map(kcardHtml).join('')}</div>
+    </div>`;
+  }).join('');
+  bindBoard();
+}
+function kcardHtml(c){
+  const idx=EK.indexOf(c.stage);
+  const due=fmtDue(c.due);
+  const tags=(c.tags||[]).map(t=>`<span class="tg">${esc((BY_ID[t]||{}).name?BY_ID[t].name.split(' ')[0]:t)}</span>`).join('');
+  return `<div class="kcard" draggable="true" data-id="${esc(c.id)}">
+    <div class="kn">${esc(c.name||'(sin nombre)')}</div>
+    ${(c.city||c.type)?`<div class="km">${esc([c.type,c.city].filter(Boolean).join(' · '))}</div>`:''}
+    ${tags?`<div class="ktags">${tags}</div>`:''}
+    ${c.next?`<div class="knext${due&&due.overdue?' due':''}">→ ${esc(c.next)}${due?' · '+esc(due.txt):''}</div>`:(due?`<div class="knext${due.overdue?' due':''}">📅 ${esc(due.txt)}</div>`:'')}
+    ${c.val?`<div class="kval">${esc(c.val)}</div>`:''}
+    <div class="kmove">
+      <button data-move="-1" data-id="${esc(c.id)}"${idx<=0?' disabled style="opacity:.25"':''}>◀</button>
+      <button data-open="${esc(c.id)}" title="Abrir lead">⌖</button>
+      <button data-move="1" data-id="${esc(c.id)}"${idx>=EK.length-1?' disabled style="opacity:.25"':''}>▶</button>
+    </div>
+  </div>`;
+}
+function bindBoard(){
+  $('board').querySelectorAll('.kcard').forEach(k=>{
+    k.addEventListener('dragstart',()=>{ dragId=k.getAttribute('data-id'); k.classList.add('drag'); });
+    k.addEventListener('dragend',()=>{ k.classList.remove('drag'); });
+  });
+  $('board').querySelectorAll('.cards').forEach(z=>{
+    z.addEventListener('dragover',e=>{ e.preventDefault(); z.classList.add('over'); });
+    z.addEventListener('dragleave',()=>z.classList.remove('over'));
+    z.addEventListener('drop',e=>{
+      e.preventDefault(); z.classList.remove('over');
+      const c=funnel.find(x=>x.id===dragId); if(!c) return;
+      c.stage=z.getAttribute('data-stage'); saveEmb(); renderBoard(); refreshCounts();
+    });
+  });
+}
+$('board').addEventListener('click',e=>{
+  const mv=e.target.closest('[data-move]');
+  if(mv&&!mv.disabled){
+    const c=funnel.find(x=>x.id===mv.getAttribute('data-id')); if(!c) return;
+    const idx=EK.indexOf(c.stage)+parseInt(mv.getAttribute('data-move'),10);
+    if(idx>=0&&idx<EK.length){ c.stage=EK[idx]; saveEmb(); renderBoard(); }
+    return;
+  }
+  const op=e.target.closest('[data-open]');
+  if(op){
+    const c=funnel.find(x=>x.id===op.getAttribute('data-open')); if(!c) return;
+    const hit=Object.entries(BIZ).find(([id,b])=>fkey(b.name,b.city)===fkey(c.name,c.city));
+    if(hit){ show('leads'); selectLead(hit[0]); }
+    else toast('Lead cargado a mano — sin ficha de auditoría');
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// PROPUESTA
+// ════════════════════════════════════════════════════════════════════════════
+let prop={ neg:'', ciu:'', at:'', sel:[], diag:'', diagTouched:false, fromLead:null };
+function startProposalFor(b,ids){
+  prop={ neg:b.name||'', ciu:b.city||'', at:'', sel:ids.slice(), diag:'', diagTouched:false, fromLead:b.id };
+  show('propuesta');
+  toast('Propuesta pre-armada con los gaps de '+(b.name||'el lead'));
+}
+function defaultDiag(){
+  const negocio=prop.neg||'tu negocio';
+  const b=prop.fromLead?getBiz(prop.fromLead):null;
+  const missing=b?CHANNELS.filter(c=>b[c.k]===false).map(c=>c.t):[];
+  const names=prop.sel.map(id=>BY_ID[id]&&BY_ID[id].name).filter(Boolean);
+  if(!names.length) return 'Relevamos '+negocio+' y detectamos oportunidades concretas para conseguir más clientes y ordenar la operación. Elegí los servicios a la izquierda y este texto se arma solo (podés editarlo).';
+  const lista=names.length===1?names[0]:names.slice(0,-1).join(', ')+' y '+names[names.length-1];
+  const gapTxt=missing.length?('Hoy le falta presencia en: '+missing.join(', ')+'. '):'';
+  return 'Relevamos '+negocio+' y encontramos lugar para crecer sin cambiar cómo trabajás. '+gapTxt
+    +'Proponemos poner a andar '+lista+' — sistemas que corren solos, se pagan con lo que hoy se pierde '
+    +'(clientes que no encuentran el negocio, mensajes sin responder, turnos que no avisan) y quedan a tu nombre.';
+}
+function renderPropEditor(){
+  // selector de leads
+  const entries=Object.entries(BIZ).sort((a,b)=>(a[1].name||'').localeCompare(b[1].name||''));
+  $('pBiz').innerHTML='<option value="">— a mano —</option>'+entries.map(([id,b])=>
+    `<option value="${esc(id)}"${id===prop.fromLead?' selected':''}>${esc(b.name||id)}${b.city?' · '+esc(b.city):''}</option>`).join('');
+  $('pNeg').value=prop.neg; $('pCiu').value=prop.ciu; $('pAt').value=prop.at;
+  $('pDiag').value=prop.diagTouched?prop.diag:'';
+  $('pDiag').placeholder=defaultDiag();
+  $('pSena').value=cfg.sena; $('pValid').value=cfg.valid; $('pMon').value=moneda;
+  $('pMarca').value=cfg.marca; $('pCont').value=cfg.cont;
+  renderPropSvc();
+}
+function renderPropSvc(){
+  $('pSvcList').innerHTML=PIPELINES.map(p=>{
+    const on=prop.sel.includes(p.id); const pr=P(p.id);
+    const t=pr.mensual.precio>0?money(pr.setup.precio)+' + '+money(pr.mensual.precio)+'/mes':money(pr.setup.precio);
+    return `<label class="svc${on?' on':''}"><input type="checkbox" data-psvc="${p.id}"${on?' checked':''}>
+      <span class="ic">${p.ico}</span><span class="nm">${esc(p.name)}</span><span class="pr">${t}</span></label>`;
+  }).join('');
+}
+function renderDoc(){
+  const items=prop.sel.map(id=>BY_ID[id]).filter(Boolean);
+  const marca=cfg.marca||'Human Glitche';
+  const mp=marca.trim().split(/\s+/);
+  const brandHtml=mp.length>1?esc(mp.slice(0,-1).join(' '))+' <em>'+esc(mp[mp.length-1])+'</em>':'<em>'+esc(marca)+'</em>';
+  if(!items.length){
+    $('doc').innerHTML=`<div class="doc-empty">Elegí al menos un servicio a la izquierda — o entrá por un lead desde LEADS y la propuesta llega pre-armada con sus gaps.</div>`;
+    return;
+  }
+  let setupTot=0, mensTot=0;
+  const cards=items.map(c=>{
+    const pr=P(c.id); setupTot+=pr.setup.precio; mensTot+=pr.mensual.precio;
+    const pl=pr.mensual.precio>0
+      ?`Armado <b>${money(pr.setup.precio)}</b><br><small>Mensual ${money(pr.mensual.precio)}</small>`
+      :`Armado <b>${money(pr.setup.precio)}</b><br><small>pago único</small>`;
+    return `<div class="svccard">
+      <div class="st"><div class="snm">${c.ico} ${esc(c.name)}</div><div class="spr">${pl}</div></div>
+      <div class="sdesc">${esc(c.incluye)}</div>
+      <div class="snodes">${c.nodes.map(n=>`<span>${esc(n)}</span>`).join('')}</div>
+    </div>`;
+  }).join('');
+  const senaPct=num(parseFloat(cfg.sena),50);
+  const sena=Math.round(setupTot*senaPct/100), saldo=setupTot-sena;
+  const diagTxt=(prop.diagTouched&&prop.diag)?prop.diag:defaultDiag();
+  const hoy=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'});
+  $('doc').innerHTML=`
+    <div class="dhead">
+      <div class="dbrand">${brandHtml}<small>${esc(cfg.cont||'')}</small></div>
+      <div class="dmeta2">Propuesta<br><b>${hoy}</b><br>Válida por ${esc(String(cfg.valid||15))} días</div>
+    </div>
+    <div class="dtitle">Propuesta de servicios digitales</div>
+    <div class="dfor">Para: <b>${esc(prop.neg||'—')}</b>${prop.ciu?' · '+esc(prop.ciu):''}${prop.at?' · a la atención de '+esc(prop.at):''}</div>
+    <h3 class="sec"><span class="n">01</span> El diagnóstico</h3>
+    <div class="diag">${esc(diagTxt)}</div>
+    <h3 class="sec"><span class="n">02</span> Lo que proponemos</h3>
+    ${cards}
+    <h3 class="sec"><span class="n">03</span> La inversión</h3>
+    <div class="totbox">
+      <div class="tr"><span>Armado (única vez)</span><b>${money(setupTot)}</b></div>
+      ${mensTot>0?`<div class="tr"><span>Abono mensual</span><b>${money(mensTot)}/mes</b></div>`:''}
+      <div class="tr sub"><span>Seña para arrancar (${senaPct}%)</span><span>${money(sena)}</span></div>
+      <div class="tr sub"><span>Saldo contra entrega</span><span>${money(saldo)}</span></div>
+      <div class="tr big"><span>Para comenzar hoy</span><b>${money(sena)}</b></div>
+    </div>
+    <h3 class="sec"><span class="n">04</span> Condiciones</h3>
+    <ul class="cond">
+      <li><b>Forma de pago:</b> seña del ${senaPct}% (${money(sena)}) para comenzar; el saldo (${money(saldo)}) contra entrega.${mensTot>0?` El abono mensual (${money(mensTot)}) arranca al mes de la entrega y cubre operación y mantenimiento de lo pactado.`:''}</li>
+      <li><b>Todo a tu nombre:</b> dominio, cuentas, perfiles y accesos quedan como propiedad tuya. Trabajamos con rol de administrador.</li>
+      <li><b>Alcance cerrado:</b> incluye dos rondas de ajustes por servicio; cambios fuera de lo descripto se cotizan aparte.</li>
+      <li><b>Validez:</b> esta propuesta vale por ${esc(String(cfg.valid||15))} días desde la fecha.</li>
+    </ul>
+    <div class="dfoot">
+      <div>Próximo paso: confirmás la seña y arrancamos esta semana.<br><b>${esc(marca)}</b></div>
+      <div style="text-align:right">${esc(cfg.cont||'')}</div>
+    </div>`;
+}
+function propText(){
+  const items=prop.sel.map(id=>BY_ID[id]).filter(Boolean);
+  if(!items.length) return '';
+  let setupTot=0, mensTot=0;
+  const lines=items.map(c=>{ const pr=P(c.id); setupTot+=pr.setup.precio; mensTot+=pr.mensual.precio;
+    return `• ${c.name}\n   ${c.incluye}\n   Armado: ${money(pr.setup.precio)}${pr.mensual.precio>0?' · Mensual: '+money(pr.mensual.precio):' (pago único)'}`; });
+  const senaPct=num(parseFloat(cfg.sena),50), sena=Math.round(setupTot*senaPct/100);
+  const diagTxt=(prop.diagTouched&&prop.diag)?prop.diag:defaultDiag();
+  return [
+    `PROPUESTA — ${cfg.marca||'Human Glitche'}`,
+    `Para: ${prop.neg||'—'}${prop.ciu?' ('+prop.ciu+')':''}`, ``,
+    diagTxt, ``, `— LO QUE PROPONEMOS —`, ...lines, ``,
+    `Armado (única vez): ${money(setupTot)}`,
+    mensTot>0?`Abono mensual: ${money(mensTot)}/mes`:null,
+    `Seña para arrancar (${senaPct}%): ${money(sena)}`, ``,
+    `Válida por ${cfg.valid||15} días · ${cfg.cont||''}`
+  ].filter(x=>x!==null).join('\n');
+}
+// eventos propuesta
+$('pBiz').addEventListener('change',()=>{
+  const id=$('pBiz').value;
+  if(!id){ prop.fromLead=null; return; }
+  const b=getBiz(id);
+  const recos=recosOf(b).slice(0,3).map(x=>x.p.id);
+  prop.neg=b.name||''; prop.ciu=b.city||''; prop.fromLead=id;
+  if(!prop.sel.length) prop.sel=recos;
+  prop.diagTouched=false; prop.diag='';
+  renderPropEditor(); renderDoc();
+});
+[['pNeg','neg'],['pCiu','ciu'],['pAt','at']].forEach(([id,k])=>{
+  $(id).addEventListener('input',()=>{ prop[k]=$(id).value; if(!prop.diagTouched) $('pDiag').placeholder=defaultDiag(); renderDoc(); });
+});
+$('pDiag').addEventListener('input',()=>{ prop.diag=$('pDiag').value; prop.diagTouched=!!prop.diag; if(!prop.diagTouched) $('pDiag').placeholder=defaultDiag(); renderDoc(); });
+$('pSena').addEventListener('input',()=>{ cfg.sena=parseFloat($('pSena').value)||0; saveCfg(); renderDoc(); });
+$('pValid').addEventListener('input',()=>{ cfg.valid=parseInt($('pValid').value,10)||15; saveCfg(); renderDoc(); });
+$('pMon').addEventListener('change',()=>{ moneda=$('pMon').value; try{localStorage.setItem(LS_MON,moneda);}catch(e){} renderPropSvc(); renderDoc(); });
+$('pMarca').addEventListener('input',()=>{ cfg.marca=$('pMarca').value; saveCfg(); renderDoc(); });
+$('pCont').addEventListener('input',()=>{ cfg.cont=$('pCont').value; saveCfg(); renderDoc(); });
+$('pSvcList').addEventListener('change',e=>{
+  const cb=e.target.closest('input[data-psvc]'); if(!cb) return;
+  const id=cb.getAttribute('data-psvc'); const i=prop.sel.indexOf(id);
+  if(cb.checked&&i<0) prop.sel.push(id); else if(!cb.checked&&i>=0) prop.sel.splice(i,1);
+  if(!prop.diagTouched) $('pDiag').placeholder=defaultDiag();
+  renderPropSvc(); renderDoc();
+});
+$('printBtn').addEventListener('click',()=>{ if(!prop.sel.length){ toast('Elegí al menos un servicio'); return; } window.print(); });
+$('copyPropBtn').addEventListener('click',()=>{
+  const t=propText(); if(!t){ toast('Propuesta vacía'); return; }
+  if(navigator.clipboard) navigator.clipboard.writeText(t).then(()=>toast('Texto copiado'),()=>prompt('Copiá la propuesta:',t));
+  else prompt('Copiá la propuesta:',t);
+});
+$('clearPropBtn').addEventListener('click',()=>{
+  if(!confirm('¿Limpiar la propuesta actual?')) return;
+  prop={neg:'',ciu:'',at:'',sel:[],diag:'',diagTouched:false,fromLead:null};
+  renderPropEditor(); renderDoc();
+});
+$('savePropBtn').addEventListener('click',()=>{
+  if(!prop.sel.length){ toast('Elegí al menos un servicio'); return; }
+  let setup=0, mens=0;
+  prop.sel.forEach(id=>{ const pr=P(id); setup+=pr.setup.precio; mens+=pr.mensual.precio; });
+  props.unshift({ id:uid(), ts:Date.now(), neg:prop.neg, ciu:prop.ciu, sel:prop.sel.slice(), setup, mensual:mens, estado:'enviada' });
+  saveProps();
+  // mueve (o crea) la card del embudo a Propuesta
+  const b=(prop.fromLead&&getBiz(prop.fromLead))||{name:prop.neg,city:prop.ciu,type:''};
+  if(b.name){ const c=ensureFunnelCard(b,'propuesta'); c.stage='propuesta'; c.val=money(setup); if(!c.next){ c.next='seguimiento de propuesta'; } saveEmb(); }
+  refreshCounts(); renderPropHist();
+  toast('Propuesta guardada — lead en etapa Propuesta');
+});
+function renderPropHist(){
+  $('propHist').innerHTML=props.length?props.map(p=>`
+    <div class="hrow">
+      <div class="hn"><b>${esc(p.neg||'—')}${p.ciu?' · '+esc(p.ciu):''}</b><small>${fmtDate(p.ts)} · ${p.sel.length} servicio(s)</small></div>
+      <div class="hv">${money(p.setup)}${p.mensual>0?' +'+money(p.mensual)+'/mes':''}</div>
+      <select data-pst="${esc(p.id)}">
+        ${['enviada','aceptada','rechazada'].map(s=>`<option value="${s}"${p.estado===s?' selected':''}>${s}</option>`).join('')}
+      </select>
+      <button class="btn sm" data-pload="${esc(p.id)}">Cargar</button>
+      <button class="btn sm danger" data-pdel="${esc(p.id)}">✕</button>
+    </div>`).join(''):`<div class="empty">Todavía no guardaste propuestas. Armá una y tocá 💾 Guardar — queda acá y alimenta el PULSO.</div>`;
+}
+$('propHist').addEventListener('change',e=>{
+  const s=e.target.closest('[data-pst]'); if(!s) return;
+  const p=props.find(x=>x.id===s.getAttribute('data-pst')); if(!p) return;
+  p.estado=s.value; saveProps();
+  // aceptada → cerrado en el embudo
+  if(s.value==='aceptada'||s.value==='rechazada'){
+    const c=funnel.find(x=>fkey(x.name,x.city)===fkey(p.neg,p.ciu));
+    if(c){ c.stage=s.value==='aceptada'?'cerrado':'perdido'; saveEmb(); }
+  }
+  toast('Estado: '+s.value);
+});
+$('propHist').addEventListener('click',e=>{
+  const ld=e.target.closest('[data-pload]');
+  if(ld){ const p=props.find(x=>x.id===ld.getAttribute('data-pload')); if(!p) return;
+    prop={neg:p.neg,ciu:p.ciu,at:'',sel:p.sel.slice(),diag:'',diagTouched:false,fromLead:null};
+    renderPropEditor(); renderDoc(); toast('Propuesta cargada'); return; }
+  const dl=e.target.closest('[data-pdel]');
+  if(dl){ if(!confirm('¿Borrar esta propuesta guardada?')) return;
+    props=props.filter(x=>x.id!==dl.getAttribute('data-pdel')); saveProps(); renderPropHist(); }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// CATÁLOGO
+// ════════════════════════════════════════════════════════════════════════════
+function renderCat(){
+  $('editPricesBtn').classList.toggle('on',editPrices);
+  $('catGrid').innerHTML=PIPELINES.map(p=>{
+    const pr=P(p.id);
+    const tot=pr.setup.precio+pr.mensual.precio;
+    const mg=tot>0?Math.round(((pr.setup.precio-pr.setup.costo)+(pr.mensual.precio-pr.mensual.costo))/tot*100):0;
+    const priceBlock=editPrices
+      ?`<div class="priceline" data-id="${p.id}">
+          <span>Setup costo <input class="priceedit" data-f="setup.costo" type="number" value="${pr.setup.costo}"></span>
+          <span>precio <input class="priceedit" data-f="setup.precio" type="number" value="${pr.setup.precio}"></span>
+          <span>Mes costo <input class="priceedit" data-f="mensual.costo" type="number" value="${pr.mensual.costo}"></span>
+          <span>precio <input class="priceedit" data-f="mensual.precio" type="number" value="${pr.mensual.precio}"></span>
+        </div>`
+      :`<div class="priceline">
+          <span>Setup <b>${money(pr.setup.precio)}</b></span>
+          <span>Mensual <b>${pr.mensual.precio>0?money(pr.mensual.precio):'—'}</b></span>
+          <span class="mg">margen ~${mg}%</span>
+        </div>`;
+    return `<div class="pcard">
+      <div class="head"><div class="ico">${p.ico}</div><div><h3>${esc(p.name)}</h3><div class="tag">${esc(p.tag)}</div></div></div>
+      <p class="desc">${esc(p.desc)}</p>
+      <div class="flow">${p.nodes.map(n=>`<span>${esc(n)}</span>`).join('')}</div>
+      ${priceBlock}
+    </div>`;
+  }).join('');
+}
+$('editPricesBtn').addEventListener('click',()=>{ editPrices=!editPrices; renderCat(); });
+$('resetPricesBtn').addEventListener('click',()=>{
+  if(!confirm('¿Volver a los precios por defecto? (afecta también PIPELINES/PROPUESTA/GUÍA)')) return;
+  priceOv={}; savePrice(); renderCat(); toast('Precios reseteados');
+});
+$('catGrid').addEventListener('input',e=>{
+  const inp=e.target.closest('.priceedit'); if(!inp) return;
+  const id=inp.closest('.priceline').getAttribute('data-id');
+  const [grp,f]=inp.getAttribute('data-f').split('.');
+  const v=parseFloat(inp.value); if(isNaN(v)) return;
+  priceOv[id]=priceOv[id]||{}; priceOv[id][grp]=priceOv[id][grp]||{}; priceOv[id][grp][f]=v;
+  savePrice();
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// GUÍA — mismo contenido que GUÍA DE VENTA
+// ════════════════════════════════════════════════════════════════════════════
+const STEPS=[
+  { t:'PROSPECCIÓN', h:'a quién le vendo', d:
+`Andá a la pestaña <b>LEADS</b>, filtrá por tu ciudad y ordená por peor salud digital: los chips en rojo (sin web, sin WhatsApp Business, sin redes) son la puerta de entrada. Empezá por los que ya conocés o donde comprás: la confianza previa vale más que cualquier guión. Armá una lista corta — <b>10 negocios</b> — sumalos al embudo y trabajala hasta agotarla antes de sumar más.<br><br><b>🔥 Tip gastro:</b> los comercios que ya están en <b>PedidosYa / Rappi</b> son <b>leads calientes</b> — ya saben vender online, tienen volumen y les duele la comisión del 20-30%. Usá esa ficha como el <b>"antes"</b> para venderles su <b>canal propio</b> (MENÚ + PEDIDOS y TIENDA + PAGOS).` },
+  { t:'PRIMER CONTACTO', h:'vender la charla, no el servicio', d:
+`Por WhatsApp o en persona. El objetivo del primer mensaje <b>no es vender</b>: es conseguir una charla de 10 minutos. Mencioná algo específico del negocio (su hueco real) para demostrar que no es spam masivo. En la ficha de cada lead, el botón 💬 abre WhatsApp con el primer mensaje del servicio más recomendado ya escrito — revisalo y adaptalo antes de mandar.` },
+  { t:'DIAGNÓSTICO', h:'que el problema lo diga él', d:
+`En la charla, preguntá antes de proponer (cada servicio tiene sus preguntas abajo). Mostrale <b>sus propios chips en rojo</b> desde la ficha del lead: el diagnóstico visual convence más que cualquier discurso. Cuando el dueño dice en voz alta "sí, pierdo ventas por eso" — ahí recién aparece tu propuesta.` },
+  { t:'PROPUESTA', h:'máximo 3 servicios, valor antes que precio', d:
+`Desde la ficha del lead tocá <b>📄 Armar propuesta</b>: llega pre-armada con sus gaps (dejá <b>2-3 pipelines máximo</b> — más que eso abruma y no se decide nada). Presentá siempre en este orden: el problema (su hueco) → qué va a pasar cuando esté resuelto → recién ahí el precio. El setup se ancla contra lo que pierde por mes sin el sistema.` },
+  { t:'CIERRE', h:'pedir algo chico y callarse', d:
+`No pidas "que lo piense": pedí un <b>próximo paso chico y concreto</b> — "¿me pasás las fotos esta semana?", "¿me mandás las 5 preguntas que más te hacen?". Después de decir el precio, <b>silencio</b>: el primero que habla, cede. Si duda, ofrecé arrancar por el pipeline más barato como prueba.` },
+  { t:'ONBOARDING', h:'el cliente contento vende por vos', d:
+`La primera semana <b>sobre-comunicá</b>: avances, capturas, "ya quedó esto". Al mes, con el sistema andando, pedí las dos cosas que valen oro: una <b>reseña</b> y un <b>referido</b> ("¿conocés otro comercio al que le sirva esto?"). Cada cliente cerrado te abre la puerta de los vecinos.` },
+];
+const RULES=[
+  {t:'Vendé el hueco, no la tecnología', d:'Al dueño no le importa "automatización con bot": le importa no perder ventas mientras atiende. Hablá del problema, no del stack.'},
+  {t:'Hablá de la plata de él', d:'Cada precio se compara con lo que pierde: turnos ausentes, comisión de apps, ventas que se van sin contestar. El servicio se paga solo o no se vende.'},
+  {t:'Específico gana a genérico', d:'"Vi que no tenés web" abre puertas; "ofrezco servicios digitales" las cierra. Siempre nombrá su hueco concreto.'},
+  {t:'El mensual es tranquilidad', d:'El setup compra el sistema; el mensual compra que funcione siempre y que haya alguien cuando algo se rompe. Nombralo así.'},
+  {t:'Una prueba corta cierra más que un contrato largo', d:'"Probalo un mes y medimos" baja la barrera. Con el sistema andando, nadie lo quiere apagar.'},
+  {t:'No regatees: recortá alcance', d:'Si el precio no entra, sacá un pipeline de la propuesta en vez de bajar el precio. El precio bajo de hoy es el techo de mañana.'},
+];
+const GUIA=[
+  { id:'web',
+    pitch:`Hoy, cuando alguien te busca en Google, no aparece nada tuyo — aparece la competencia. Te armo un sitio simple que carga rápido, con tus fotos, horarios y botón de WhatsApp, y te dejo la ficha de Google al día. En una semana existís en internet.`,
+    wa:`Hola! Soy [tu nombre], trabajo con comercios de [ciudad]. Busqué [negocio] en Google y no encontré página propia — ahí se pierde gente que quiere ver precios y horarios antes de ir. Armo webs simples y rápidas para negocios como el tuyo. ¿Te muestro un ejemplo? Son 2 minutos.`,
+    preguntas:[`¿Cómo te encuentran hoy los clientes nuevos?`,`¿Cuántas veces por semana te preguntan horarios o precios por teléfono?`,`Si alguien te googlea ahora mismo, ¿qué aparece?`],
+    objeciones:[
+      {o:`Ya tengo Instagram, no necesito web`, r:`Instagram es terreno alquilado: el algoritmo decide quién te ve. La web es tuya, aparece en Google y no depende de nadie. Van juntas, no compiten.`},
+      {o:`Es caro`, r:`Compará con una sola venta perdida por semana de gente que te googleó y no encontró nada. El armado se paga una vez; el mensual es mantenimiento, no te vuelvo a cobrar el sitio.`},
+      {o:`Mi sobrino me la puede hacer`, r:`Si te la hace, genial. Lo que yo vendo es que quede terminada, rápida y apareciendo en Google — y alguien que responde cuando algo se rompe un sábado.`}],
+    cierre:`Te la dejo andando en 7 días con tus fotos y textos. Si antes de publicarla no te gusta cómo quedó, no se publica y no pasa nada. ¿Arrancamos juntando las fotos esta semana?` },
+  { id:'wa',
+    pitch:`El 80% de tus ventas pasa por WhatsApp y contestás todo a mano. Te configuro WhatsApp Business con catálogo y respuestas automáticas para las preguntas de siempre — horario, precios, ubicación — y vos contestás solo lo que de verdad vende.`,
+    wa:`Hola! Soy [tu nombre]. Vi que [negocio] atiende por WhatsApp común — te escriben fuera de horario y esas ventas se enfrían. Configuro WhatsApp Business con catálogo y respuestas automáticas: lo repetido se contesta solo, al instante. ¿Te cuento cómo en 10 minutos?`,
+    preguntas:[`¿Cuántos mensajes contestás por día?`,`¿Cuáles son las 5 preguntas que te hacen siempre?`,`¿Sentís que perdés ventas por contestar tarde?`],
+    objeciones:[
+      {o:`Los bots son fríos, mis clientes quieren hablar conmigo`, r:`No es un bot que charla: responde lo repetido (horario, dirección, precios) al segundo y te pasa la conversación cuando hay que vender. El cliente prefiere respuesta inmediata antes que esperar dos horas.`},
+      {o:`Ya uso WhatsApp normal y me funciona`, r:`Business es gratis y suma catálogo, etiquetas y respuestas rápidas. Te lo dejo armado con tu catálogo cargado — seguís usando el mismo número.`},
+      {o:`¿Y si responde cualquier cosa?`, r:`Solo responde lo que definimos juntos, palabra por palabra. Todo lo que no está definido te llega a vos como siempre.`}],
+    cierre:`En una tarde te lo dejo funcionando con el catálogo cargado. ¿Me pasás la lista de las 5 preguntas que más te hacen?` },
+  { id:'social',
+    pitch:`Publicar todos los días no es tu trabajo — es el mío. Calendario mensual, contenido con tu estética, programado en horario, y un reporte que entendés en 2 minutos. Presencia constante sin que vivas pegado al teléfono.`,
+    wa:`Hola! Soy [tu nombre]. Vi el Instagram de [negocio] — el último posteo es de hace [X]. No es falta de ganas, es falta de tiempo: el negocio se atiende solo si estás vos. Yo me encargo del contenido: calendario, posteos con tu estética y reporte mensual. ¿Te muestro cómo se vería tu primer mes?`,
+    preguntas:[`¿Quién publica hoy y cada cuánto?`,`¿Alguna vez un posteo te trajo clientes que puedas nombrar?`,`¿Cuánto tiempo por semana le podés dedicar a las redes, en serio?`],
+    objeciones:[
+      {o:`Puedo publicar yo`, r:`Publicar podés; sostenerlo tres meses seguidos con calidad y horario, casi nadie. Lo que el algoritmo (y la gente) premia es la constancia — eso es lo que vendo.`},
+      {o:`Las redes no me traen ventas`, r:`Sin plan, las redes son ruido. Con calendario, horarios y reporte medimos qué posteo trae gente y repetimos ese. Lo que no se mide no mejora.`},
+      {o:`Es caro por mes`, r:`Es una fracción de un community manager fijo, y trabaja todos los días del mes. Además cortás cuando quieras.`}],
+    cierre:`Armemos el primer mes: 12 posteos con tu estética, programados. Si el reporte del mes 1 no te convence, cortás sin compromiso.` },
+  { id:'menu',
+    pitch:`QR en la mesa o en la vidriera: el cliente ve la carta, arma el pedido y te cae ordenado a tu WhatsApp, con seña opcional. Menos idas y vueltas, tickets más grandes y cero comisión de apps de delivery.`,
+    wa:`Hola! Soy [tu nombre]. ¿Cuánto te queda de cada pedido después de la comisión de PedidosYa/Rappi? Armo cartas digitales con QR: el cliente pide y te llega directo al WhatsApp, sin comisión. Tu canal propio. ¿Te muestro una carta de ejemplo andando?`,
+    preguntas:[`¿Cuánto pagás de comisión a las apps de delivery por mes?`,`¿Los pedidos por WhatsApp te llegan ordenados o hay que ir y venir preguntando?`,`¿Cada cuánto cambiás precios o platos?`],
+    objeciones:[
+      {o:`Ya estoy en PedidosYa`, r:`Con 20-30% de comisión — y ese cliente es de ellos, no tuyo: no tenés su contacto para hacerlo volver. Esto no reemplaza a las apps: es tu canal directo para el cliente fiel, donde ese margen te lo quedás vos y el dato es tuyo. Conviven perfecto.`},
+      {o:`Mis clientes son grandes, no usan QR`, r:`El QR es una puerta más, no reemplaza nada. El que no lo usa pide como siempre; el que sí, te ahorra diez mensajes por pedido.`},
+      {o:`¿Y cuando cambio los precios?`, r:`Los cambiás vos desde el celular en un minuto, o me lo mandás y lo cambio yo en el día. La carta nunca queda vieja.`}],
+    cierre:`Te armo la carta digital con tus fotos esta semana y la probamos en 5 mesas. Si funciona, va a todo el salón.` },
+  { id:'leads',
+    pitch:`Cada visita que entra a tu web y se va sin dejar contacto es plata perdida. Formulario simple más seguimiento automático por WhatsApp o mail: el interesado deja su dato y el sistema lo persigue por vos hasta que compra o dice que no.`,
+    wa:`Hola! Soy [tu nombre]. Vi la web de [negocio] — entra gente, mira y se va sin dejar rastro. Instalo un sistema que captura el contacto del interesado y le hace seguimiento automático. Nada de perseguir gente a mano. ¿Te cuento cómo funciona en 10 minutos?`,
+    preguntas:[`¿Cuántas consultas te llegan por semana y cuántas terminan en venta?`,`¿Qué pasa hoy con el que pregunta y no compra? ¿Alguien lo vuelve a contactar?`,`¿Dónde anotás los interesados?`],
+    objeciones:[
+      {o:`Ya me escriben por Instagram`, r:`Y se pierden en el inbox entre historias y spam. Esto los ordena en una lista con nombre, teléfono y qué querían — ninguno se pierde, a todos se les hace seguimiento.`},
+      {o:`No tengo tiempo de responder leads`, r:`Por eso el seguimiento es automático: responde al instante, insiste con criterio y te avisa cuáles están calientes para que llames solo a esos.`}],
+    cierre:`Lo conecto a tu web en 2 días. El primer mes contamos cuántos contactos entran — con los números en la mano decidís si sigue.` },
+  { id:'resenas',
+    pitch:`Cuando alguien te googlea, las estrellas deciden antes de que vos puedas hablar. Sistema que le pide la reseña al cliente contento en el momento justo y te avisa del enojado antes de que explote en Google. La nota sube sola.`,
+    wa:`Hola! Soy [tu nombre]. Vi que [negocio] tiene ★[nota] con [N] reseñas en Google — la competencia de tu zona tiene más y eso decide adónde va la gente. Armo un sistema que pide reseñas a tus clientes contentos automáticamente. ¿Te muestro cómo?`,
+    preguntas:[`¿Sabés qué nota tenés hoy en Google? ¿Y tu competencia de la zona?`,`¿Le pedís reseña a algún cliente? ¿Cómo te resulta?`,`¿Te enteraste alguna vez de una queja recién cuando ya era reseña pública?`],
+    objeciones:[
+      {o:`Me da vergüenza pedir reseñas`, r:`No pedís vos: un mensaje automático post-venta lo hace con el timing perfecto. Al cliente contento no le molesta — le gusta ayudar a un negocio que lo atendió bien.`},
+      {o:`Tengo una reseña mala vieja que me mata`, r:`Se tapa con volumen: veinte reseñas nuevas de 5 estrellas la entierran. Y las negativas nuevas las agarramos en privado antes de que lleguen a Google.`}],
+    cierre:`En 90 días subimos la nota. Arrancamos con tus últimos 30 clientes — ¿tenés sus WhatsApp?` },
+  { id:'turnos',
+    pitch:`Cada turno que no se presenta es plata que no vuelve. Link de reserva, confirmación y recordatorio automático 24 horas antes. Los que no pueden venir avisan, y vos llenás el hueco con otro.`,
+    wa:`Hola! Soy [tu nombre]. Pregunta directa: ¿cuántos turnos se te caen por semana sin aviso? Armo agendas con recordatorio automático 24h antes — el ausentismo baja a la mitad y el hueco se llena. ¿Te cuento cómo en 10 minutos?`,
+    preguntas:[`¿Cuántos turnos por semana no se presentan sin avisar?`,`¿Cuánto vale un turno promedio? (hacé la cuenta del mes)`,`¿Te escriben para reservar fuera de horario?`],
+    objeciones:[
+      {o:`Mi agenda de papel funciona bien`, r:`Hasta que alguien no viene y no avisó. El recordatorio automático baja el ausentismo a la mitad — solo eso paga el sistema. El papel puede seguir existiendo, esto lo complementa.`},
+      {o:`Mis clientas prefieren llamar`, r:`Y pueden seguir llamando. El link es para las que te escriben a las 11 de la noche y no quieren esperar a mañana para saber si hay lugar.`}],
+    cierre:`Te lo dejo andando con tus horarios reales en 3 días. Contá los ausentes de este mes y los del que viene — esa comparación cierra sola.` },
+  { id:'factura',
+    pitch:`De la venta al comprobante sin cargar todo dos veces: la factura A/B/C se arma, se envía por mail o WhatsApp y queda registrada. El círculo administrativo se cierra solo, sin pilas de papeles para el contador.`,
+    wa:`Hola! Soy [tu nombre]. ¿Cuánto tiempo por semana se te va en armar y mandar facturas? Automatizo el circuito: de la venta al comprobante enviado y registrado, sin doble carga. Tu contador recibe todo ordenado. ¿Te muestro cómo?`,
+    preguntas:[`¿Cuántas facturas hacés por semana y cuánto tardás con cada una?`,`¿Alguna vez se te pasó facturar algo?`,`¿Cómo le llega la info a tu contador a fin de mes?`],
+    objeciones:[
+      {o:`Mi contador se encarga de eso`, r:`Se encarga de los impuestos. Esto le simplifica la vida también a él: todo registrado y ordenado le llega listo, y vos dejás de ser el cuello de botella.`},
+      {o:`Facturo poco, no me hace falta`, r:`Justo por eso: cuando facturás poco, cada hora administrativa te duele más — es hora que no estás vendiendo.`}],
+    cierre:`Con 3 facturas de ejemplo tuyas te lo dejo configurado. ¿Me pasás una factura tipo de las que hacés?` },
+  { id:'tienda',
+    pitch:`Tu catálogo online con carrito y Mercado Pago: el cliente elige, paga, y a vos te llega el pedido ya cobrado. Vendés mientras dormís, sin comisión de marketplace y con la lista de clientes en tu poder.`,
+    wa:`Hola! Soy [tu nombre]. Vi que [negocio] vende por Instagram — cada venta son quince mensajes de ida y vuelta. Armo tiendas simples con Mercado Pago: el cliente elige y paga solo, el pedido te llega cobrado. ¿Te muestro una tienda de ejemplo?`,
+    preguntas:[`¿Cuántos mensajes te lleva cerrar una venta por DM?`,`¿Cuántas ventas se enfrían en el ida y vuelta de "¿hay stock?" "¿cuánto sale?" "¿cómo pago?"?`,`¿Vendés por MercadoLibre? ¿Cuánto te queda después de la comisión?`],
+    objeciones:[
+      {o:`Ya vendo por Instagram y funciona`, r:`Vender por DM funciona pero es lento: quince mensajes por venta. Con la tienda, el cliente elige, paga y listo — el DM queda para atender, no para cobrar.`},
+      {o:`MercadoLibre ya me resuelve esto`, r:`Cobrándote comisión y mostrándote al lado de tu competencia. La tienda propia es tu margen completo y tu lista de clientes — que hoy es de ML, no tuya.`}],
+    cierre:`Subimos primero tus 20 productos más vendidos. En una semana estás cobrando online.` },
+  { id:'ads',
+    pitch:`Tus próximos clientes están a veinte cuadras y no saben que existís. Campañas en Instagram y Google segmentadas a tu barrio, con piezas hechas por nosotros y un reporte claro: cuánto pusiste, cuánta gente vino.`,
+    wa:`Hola! Soy [tu nombre]. ¿Alguna vez pusiste plata en publicidad y no supiste si sirvió? Armo campañas hiperlocales (solo tu zona) con piezas propias y reporte claro: cada peso, medido. ¿Te cuento cómo sería para [negocio]?`,
+    preguntas:[`¿Probaste pauta alguna vez? ¿Qué pasó?`,`¿De qué zona vienen tus clientes hoy?`,`¿Cuánto vale para vos un cliente nuevo que se queda?`],
+    objeciones:[
+      {o:`Probé ads y tiré la plata`, r:`Boosteando posteos sin segmentar, seguro. Campaña con objetivo, público local y pieza pensada es otro deporte — y el reporte te muestra exactamente qué volvió de cada peso.`},
+      {o:`No tengo presupuesto para pauta`, r:`Arrancamos hiperlocal con poca pauta: poca plata bien apuntada a veinte cuadras rinde más que mucha plata regada por toda la ciudad.`}],
+    cierre:`Primer mes de prueba con pauta chica. Si el costo por cliente nuevo no te cierra con los números en la mano, lo cortamos.` },
+  { id:'email',
+    pitch:`Conseguir un cliente nuevo cuesta cinco veces más que hacer volver a uno que ya te compró. Base de clientes con newsletter, cupones y saludo de cumpleaños automático: el que ya te conoce, vuelve más seguido.`,
+    wa:`Hola! Soy [tu nombre]. ¿Cuántos clientes pasaron por [negocio] este año? ¿Y a cuántos les podés avisar cuando hay algo nuevo? Armo bases de clientes con cupones y cumpleaños automático — el cliente viejo vuelve solo. ¿Te cuento cómo se arma?`,
+    preguntas:[`¿Tenés forma de avisarle a tus clientes cuando hay una promo?`,`¿Sabés cuántos de tus clientes vuelven?`,`¿Qué hacés hoy para que el que compró una vez vuelva?`],
+    objeciones:[
+      {o:`El mail no lo lee nadie`, r:`El de las marcas genéricas, no. El de tu negocio de barrio con un cupón real, sí se abre — y el saludo de cumpleaños con descuento es el mensaje más abierto que existe.`},
+      {o:`No tengo ninguna lista de clientes`, r:`La armamos desde cero: QR en el mostrador con un descuento por anotarse. En un mes tenés cientos de contactos que son tuyos, no del algoritmo.`}],
+    cierre:`Armamos la base este mes con el QR en caja. El primer envío con promo sale antes de fin de mes.` },
+  { id:'brand',
+    pitch:`Tu negocio es bueno pero se ve improvisado: logo pixelado, cada posteo de un color distinto. Identidad completa — logo, paleta, tipografías y plantillas para redes — para que todo lo tuyo se vea de la misma casa. Pago único: el pack es tuyo para siempre.`,
+    wa:`Hola! Soy [tu nombre], diseño identidades para comercios. Vi las redes de [negocio]: el producto es bueno pero cada posteo parece de un negocio distinto — eso resta confianza. Armo el pack completo: logo, colores, tipografías y plantillas listas. ¿Te muestro ejemplos?`,
+    preguntas:[`¿Quién hizo tu logo actual? ¿Tenés el archivo original en buena calidad?`,`¿Tus posteos, tu vidriera y tus bolsas se ven de la misma marca?`,`¿Cómo querés que la gente describa tu negocio en una palabra?`],
+    objeciones:[
+      {o:`Ya tengo logo`, r:`Y si sirve lo respetamos: lo afinamos y le armamos el sistema alrededor — paleta, tipografías, plantillas, todo consistente. No es empezar de cero, es terminar lo que empezaste.`},
+      {o:`Eso es para marcas grandes`, r:`Al revés: a la marca grande ya la conocen. Al negocio chico, verse prolijo y consistente le da la confianza que todavía no tiene. Es el traje para la entrevista.`}],
+    cierre:`En 10 días tenés el pack completo con mini manual y plantillas listas para usar en redes. Pago único — ¿arrancamos con el brief esta semana?` },
+  { id:'video',
+    pitch:`Las redes hoy son video: el que no publica reels no existe para el algoritmo. Pack mensual de videos cortos filmados y editados con estética propia — vos atendés el negocio, nosotros lo hacemos ver increíble.`,
+    wa:`Hola! Soy [tu nombre], hago video para comercios. Los reels son lo único que el algoritmo muestra gratis hoy — y [negocio] tiene material de sobra: el producto, el proceso, el local. Filmo y edito un pack mensual con estética propia. ¿Te muestro ejemplos de mi trabajo?`,
+    preguntas:[`¿Publicaste algún video del negocio alguna vez? ¿Qué pasó?`,`¿Qué parte de tu laburo te parece que "queda linda en cámara"?`,`¿Seguís a algún negocio parecido al tuyo que la rompa con reels?`],
+    objeciones:[
+      {o:`Me da vergüenza salir en cámara`, r:`No hace falta que salgas: el producto, las manos, el local y el proceso son los protagonistas. Los mejores reels de comercios no tienen a nadie hablándole a la cámara.`},
+      {o:`Un reel no me trae ventas`, r:`Uno solo, no — la serie, sí. El algoritmo premia constancia, y con el reporte medimos qué formato te trae gente para repetir justo ese.`}],
+    cierre:`Primera sesión de captura en tu local: en una sola visita sacamos material para todo el mes. ¿Qué día te viene bien?` },
+];
+let gCur='web';
+function renderGuiaAll(){
+  $('gSteps').innerHTML=STEPS.map((s,i)=>`
+    <div class="step${i===0?' open':''}">
+      <div class="head"><div class="num">${i+1}</div><h3>${s.t}</h3><div class="hint">${esc(s.h)}</div></div>
+      <div class="body">${s.d}</div>
+    </div>`).join('');
+  $('gRules').innerHTML=RULES.map(r=>`<div class="rule"><b>${esc(r.t)}</b>${esc(r.d)}</div>`).join('');
+  renderGSel(); renderGuide();
+}
+function renderGSel(){
+  $('gSel').innerHTML=GUIA.map(g=>{
+    const p=BY_ID[g.id];
+    return `<button class="svcbtn${g.id===gCur?' on':''}" data-gsvc="${g.id}">${p.ico} ${esc(p.name)}</button>`;
+  }).join('');
+}
+function renderGuide(){
+  const g=GUIA.find(x=>x.id===gCur); if(!g) return;
+  const p=BY_ID[g.id]; const pr=P(g.id);
+  const priceHtml=(pr.setup.precio+pr.mensual.precio>0)
+    ?`Setup <b>${money(pr.setup.precio)}</b> · Mensual <b>${money(pr.mensual.precio)}</b><br><small>tu costo: ${money(pr.setup.costo)} + ${money(pr.mensual.costo)}/mes</small>`
+    :`<small>precio a definir</small>`;
+  $('gGuide').innerHTML=`<div class="guide">
+    <div class="gtop">
+      <div><h2>${p.ico} ${esc(p.name)}</h2><div class="gtag">${esc(p.tag)}</div></div>
+      <div class="price">${priceHtml}</div>
+    </div>
+    <div class="blk"><div class="bl">Pitch de 30 segundos <span class="cp" data-copy="pitch">📋 copiar</span></div>
+      <div class="script" id="txt-pitch">${esc(g.pitch)}</div></div>
+    <div class="blk"><div class="bl">Primer mensaje de WhatsApp <span class="cp" data-copy="wa">📋 copiar</span></div>
+      <div class="script" id="txt-wa">${esc(g.wa)}</div></div>
+    <div class="blk"><div class="bl">Preguntas de diagnóstico — preguntá antes de proponer</div>
+      <div class="qs">${g.preguntas.map(q=>`<div class="q">${esc(q)}</div>`).join('')}</div></div>
+    <div class="blk"><div class="bl">Objeciones y cómo responderlas</div>
+      ${g.objeciones.map(x=>`<div class="obj"><div class="o">${esc(x.o)}</div><div class="r">${esc(x.r)}</div></div>`).join('')}</div>
+    <div class="blk"><div class="close-blk">${esc(g.cierre)}</div></div>
+  </div>`;
+}
+$('gSteps').addEventListener('click',e=>{
+  const st=e.target.closest('.step'); if(!st||e.target.closest('a')) return; st.classList.toggle('open');
+});
+$('gSel').addEventListener('click',e=>{
+  const b=e.target.closest('[data-gsvc]'); if(!b) return;
+  gCur=b.getAttribute('data-gsvc'); renderGSel(); renderGuide();
+});
+$('gGuide').addEventListener('click',e=>{
+  const c=e.target.closest('[data-copy]'); if(!c) return;
+  const el=$('txt-'+c.getAttribute('data-copy')); if(!el) return;
+  const t=el.textContent;
+  if(navigator.clipboard) navigator.clipboard.writeText(t).then(()=>toast('Copiado — adaptá los [corchetes]'),()=>prompt('Copiá el texto:',t));
+  else prompt('Copiá el texto:',t);
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════════════════
+refreshCounts();
+renderPulso();
+loadBiz().then(()=>{
+  refreshCounts();
+  if(curView==='pulso') renderPulso();
+  if(curView==='leads') renderLeads();
+  // handoff compatible con AUDITORÍA: ?biz=Nombre&city=Ciudad
+  const hp=new URLSearchParams(location.search), nm=(hp.get('biz')||'').trim().toLowerCase();
+  if(nm){
+    const cy=(hp.get('city')||'').trim().toLowerCase();
+    const hit=Object.entries(BIZ).find(([id,b])=>(b.name||'').trim().toLowerCase()===nm&&(!cy||(b.city||'').trim().toLowerCase()===cy));
+    if(hit){ show('leads'); selectLead(hit[0]); }
+  }
+});
+})();
+</script>
+</body></html>
