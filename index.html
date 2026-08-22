@@ -1161,7 +1161,15 @@ async function doSearchPlaces(){
   const acc=[];
   const handlePage=(results,status,pagination)=>{
     if(status!==google.maps.places.PlacesServiceStatus.OK||!results||!results.length){
-      if(!acc.length) spStatus('Google Maps no encontró resultados (estado: '+status+').','err');
+      if(!acc.length){
+        let msg='Google Maps no encontró resultados (estado: '+status+').';
+        if(status==='REQUEST_DENIED') msg='Google rechazó la búsqueda (REQUEST_DENIED): tu clave de Maps no permite este dominio o no tiene la Places API habilitada. En Google Cloud → Credenciales → tu clave → "Restricciones de sitios web", agregá labs.hg-vl.com/* (y verificá que Places API esté ON). Tarda unos minutos en tomar el cambio.';
+        else if(status==='OVER_QUERY_LIMIT') msg='Google cortó por cuota (OVER_QUERY_LIMIT): esperá un rato o revisá la facturación de la clave en Google Cloud.';
+        else if(status==='ZERO_RESULTS') msg='Google no encontró nada para "'+query+'" en esa zona (ZERO_RESULTS) — probá otro término o un lugar más amplio.';
+        else if(status==='INVALID_REQUEST') msg='Búsqueda inválida (INVALID_REQUEST) — probá de nuevo en unos segundos.';
+        spStatus(msg,'err');
+        console.warn('ZETA LABS · Places textSearch:', status);
+      }
       return;
     }
     acc.push(...results);
