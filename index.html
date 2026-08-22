@@ -338,11 +338,80 @@
   }
   :focus-visible{outline:2px solid var(--acid);outline-offset:2px;}
   @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;}}
+
+  /* ════ ACREDITACIÓN (gate de entrada) — credencial holo-térmica colgante ════
+     Mismo material que la Golden Ticket de demos-portal pero en formato
+     credencial vertical con cordón y física de péndulo. Una vez por sesión
+     (sessionStorage hg_labs_acred); link ACREDITACIÓN en el header la repite. */
+  #acred{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow:hidden;
+    background:radial-gradient(100% 80% at 50% 30%,#0b0b0e,#050505 75%);transition:opacity .5s ease;}
+  #acred.out{opacity:0;pointer-events:none;}
+  #acred[hidden]{display:none;}
+  .ac-cnr{position:absolute;z-index:3;padding:14px 18px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);pointer-events:none;line-height:1.6;}
+  .ac-cnr.tl{top:0;left:0;} .ac-cnr.tr{top:0;right:0;text-align:right;} .ac-cnr.bl{bottom:0;left:0;} .ac-cnr.br{bottom:0;right:0;text-align:right;}
+  .ac-hang{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;
+    transform-origin:50% 0;will-change:transform;}
+  .ac-strap{width:46px;height:max(16vh,90px);background:repeating-linear-gradient(180deg,var(--acid) 0 8px,#a3e600 8px 16px);
+    display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px rgba(0,0,0,.25);}
+  .ac-strap span{writing-mode:vertical-rl;font-family:'Space Mono',monospace;font-weight:700;font-size:9px;letter-spacing:.3em;color:#050505;white-space:nowrap;overflow:hidden;max-height:100%;}
+  .ac-clip{width:60px;height:22px;background:linear-gradient(180deg,#d9d9d9,#8f8f8f 55%,#c8c8c8);border-radius:5px;margin-top:-2px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.7), inset 0 -2px 3px rgba(0,0,0,.4);position:relative;}
+  .ac-clip::after{content:'';position:absolute;left:50%;top:9px;width:26px;height:7px;transform:translateX(-50%);border-radius:4px;background:#3a3a3a;box-shadow:inset 0 1px 2px rgba(0,0,0,.8);}
+  .ac-badge{position:relative;width:min(330px,78vw);aspect-ratio:0.68;border-radius:18px;overflow:hidden;margin-top:-4px;
+    background:linear-gradient(160deg,#101216,#0a0b0e);
+    border:1px solid rgba(240,237,230,.3);
+    box-shadow:0 40px 110px rgba(184,255,0,.13), 0 12px 60px rgba(255,45,85,.14), 0 6px 26px rgba(0,0,0,.6);}
+  .ac-gl{position:absolute;inset:0;width:100%;height:100%;display:block;}
+  .ac-slot{position:absolute;left:50%;top:14px;transform:translateX(-50%);width:64px;height:11px;border-radius:9999px;background:#050505;
+    box-shadow:inset 0 2px 4px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.25);z-index:3;}
+  .ac-head{position:absolute;top:38px;left:20px;right:20px;display:flex;justify-content:space-between;align-items:baseline;z-index:3;}
+  .ac-head b{font-family:'Bebas Neue',sans-serif;font-weight:400;font-size:30px;line-height:.85;letter-spacing:.04em;color:#fff;text-shadow:0 1px 8px rgba(0,0,20,.8);}
+  .ac-head span{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.22em;color:#eafeff;border:1px solid rgba(160,240,255,.65);border-radius:20px;padding:3px 9px;text-shadow:0 0 10px rgba(80,200,255,.8);}
+  .ac-body{position:absolute;left:20px;bottom:74px;z-index:3;text-align:left;}
+  .ac-body .ar{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.26em;color:rgba(255,255,255,.8);text-shadow:0 1px 6px rgba(0,0,20,.8);}
+  .ac-body .an{font-family:'Bebas Neue',sans-serif;font-size:34px;line-height:.9;letter-spacing:.03em;color:#fff;text-shadow:0 0 16px rgba(90,210,255,.8),0 2px 10px rgba(0,0,20,.7);margin-top:4px;}
+  .ac-foot{position:absolute;left:20px;right:20px;bottom:16px;z-index:3;display:flex;flex-direction:column;gap:7px;}
+  .ac-bar{height:26px;border-radius:4px;background:
+    repeating-linear-gradient(90deg,#0a0a0a 0 2px,transparent 2px 5px,#0a0a0a 5px 6px,transparent 6px 11px,#0a0a0a 11px 14px,transparent 14px 16px),
+    linear-gradient(#f4f2ec,#f4f2ec);}
+  .ac-id{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.2em;color:rgba(255,255,255,.85);text-shadow:0 1px 6px rgba(0,0,20,.8);display:flex;justify-content:space-between;}
+  .ac-grainx{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:.5;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.16'/%3E%3C/svg%3E");background-size:160px;}
+  .ac-fallback{position:absolute;inset:0;z-index:1;background:linear-gradient(140deg,#0520c0,#7d10c0 30%,#e01515 55%,#ff7300 75%,#ffd230 100%);opacity:0;animation:acshift 7s ease-in-out infinite alternate;}
+  @keyframes acshift{to{filter:hue-rotate(70deg);}}
+  .ac-badge:not(.gl-on) .ac-fallback{opacity:.9;}
+  .ac-enter{position:relative;z-index:2;margin-top:26px;cursor:pointer;background:var(--acid);color:#050505;border:none;font-family:'Space Mono',monospace;font-weight:700;font-size:11px;letter-spacing:.18em;text-transform:uppercase;padding:13px 30px;border-radius:9999px;}
+  .ac-enter:hover{filter:brightness(1.08);}
+  .ac-hint{position:relative;z-index:2;margin-top:12px;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);}
+  @media(max-width:860px){ .ac-cnr.bl,.ac-cnr.br{display:none;} }
+  @media(prefers-reduced-motion:reduce){ .ac-hang{transform:none!important;} .ac-fallback{animation:none;} }
 </style></head><body>
+<!-- ════ ACREDITACIÓN — gate de entrada ════ -->
+<div id="acred" hidden>
+  <div class="ac-cnr tl">Human Glitche<br>Zeta · Labs</div>
+  <div class="ac-cnr tr"><span id="acClock">--:--:--</span><br>Acceso restringido</div>
+  <div class="ac-cnr bl">Credencial de operador<br>Acceso total</div>
+  <div class="ac-cnr br">labs.hg-vl.com</div>
+  <div class="ac-hang" id="acHang">
+    <div class="ac-strap"><span>ZETA LABS · HUMAN GLITCHE · ZETA LABS · HUMAN GLITCHE</span></div>
+    <div class="ac-clip"></div>
+    <div class="ac-badge" id="acBadge">
+      <canvas class="ac-gl" id="acGL" aria-hidden="true"></canvas>
+      <div class="ac-fallback" aria-hidden="true"></div>
+      <div class="ac-slot" aria-hidden="true"></div>
+      <div class="ac-head"><b>ZETA<br>LABS</b><span>OPERADOR</span></div>
+      <div class="ac-body"><div class="ar">ACREDITACIÓN</div><div class="an">HUMAN<br>GLITCHE</div></div>
+      <div class="ac-foot"><div class="ac-bar" aria-hidden="true"></div><span class="ac-id"><span>HG-LABS-001</span><span>ACCESO TOTAL</span></span></div>
+      <div class="ac-grainx" aria-hidden="true"></div>
+    </div>
+  </div>
+  <button class="ac-enter" id="acEnter">Entrar al laboratorio</button>
+  <div class="ac-hint">La credencial se mueve con tu mouse · entrá cuando quieras</div>
+</div>
 <div class="wrap">
   <header class="top">
     <div class="brand"><b>ZETA</b> <em>LABS</em><span class="sub">captación y venta · todo alrededor del lead</span></div>
-    <div class="hdr-links"><a href="/labs/">← LABS</a><a href="/auditoria/">AUDITORÍA</a></div>
+    <div class="hdr-links"><a href="#" id="acLink">🪪 ACREDITACIÓN</a><a href="/labs/">← LABS</a><a href="/auditoria/">AUDITORÍA</a></div>
   </header>
 
   <nav class="tabs" id="tabs">
@@ -1801,6 +1870,139 @@ loadBiz().then(()=>{
     if(hit){ show('leads'); selectLead(hit[0]); }
   }
 });
+})();
+</script>
+
+<script>
+// ════ ACREDITACIÓN: credencial holo-térmica con física de péndulo ════
+(function(){
+'use strict';
+const gate=document.getElementById('acred');
+if(!gate) return;
+const KEY='hg_labs_acred';
+function openGate(){ gate.hidden=false; gate.classList.remove('out'); startAll(); }
+function closeGate(){ gate.classList.add('out'); sessionStorage.setItem(KEY,'1');
+  setTimeout(()=>{gate.hidden=true; stop=true;},550); }
+document.getElementById('acEnter').addEventListener('click',closeGate);
+document.getElementById('acLink')&&document.getElementById('acLink').addEventListener('click',e=>{e.preventDefault();sessionStorage.removeItem(KEY);stop=false;openGate();});
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// reloj
+const ck=document.getElementById('acClock');
+setInterval(()=>{ if(!gate.hidden) ck.textContent=new Date().toLocaleTimeString('es-AR',{hour12:false}); },1000);
+
+// ── shader holo-térmico (mismo material que la Golden Ticket del portal) ──
+const badge=document.getElementById('acBadge'), cv=document.getElementById('acGL');
+const gl=cv.getContext('webgl',{antialias:true,alpha:false});
+let glOK=false,prog=null,quad=null,logoTex=null,CW=2,CH=2;
+if(gl){
+  const VS='attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}';
+  const FS=`precision highp float;
+uniform vec2 uRes;uniform float uT;uniform vec2 uTilt;uniform sampler2D uLogo;
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+ float a=hash(i),b=hash(i+vec2(1.,0.)),c=hash(i+vec2(0.,1.)),d=hash(i+vec2(1.,1.));
+ return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);}
+float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*noise(p);p=p*2.03+13.7;a*=.5;}return v;}
+vec3 thermal(float x){
+ x=clamp(x,0.,1.);
+ vec3 c1=vec3(0.02,0.05,0.50), c2=vec3(0.05,0.22,1.0), c3=vec3(0.58,0.08,0.95),
+      c4=vec3(1.0,0.10,0.14), c5=vec3(1.0,0.52,0.05), c6=vec3(1.0,0.94,0.30);
+ vec3 c=mix(c1,c2,smoothstep(0.00,0.24,x));
+ c=mix(c,c3,smoothstep(0.24,0.44,x));
+ c=mix(c,c4,smoothstep(0.44,0.64,x));
+ c=mix(c,c5,smoothstep(0.64,0.84,x));
+ c=mix(c,c6,smoothstep(0.84,1.0,x));
+ return c;
+}
+void main(){
+ vec2 uv=gl_FragCoord.xy/uRes;
+ float asp=uRes.x/uRes.y;
+ vec2 p=(uv-0.5)*vec2(asp,1.0);
+ float t=uT;
+ vec2 q=vec2(fbm(p*2.1+t*0.10+uTilt*0.55), fbm(p*2.1-t*0.085-uTilt.yx*0.4));
+ float f=fbm(p*2.4+q*2.2);
+ float heat=f*1.18+0.04+uTilt.x*0.26-uTilt.y*0.10;
+ vec3 col=thermal(heat);
+ float s=fbm(p*1.9+vec2(-t*0.16,t*0.03)+q*1.5);
+ float smoke=smoothstep(0.52,0.86,s);
+ vec3 smokeCol=mix(vec3(0.0,0.85,0.78),vec3(0.55,1.0,0.10),fbm(p*3.0+t*0.1)); // humo con verde ácido LABS
+ col=mix(col,smokeCol,smoke*0.62);
+ vec2 lp=p/0.42+vec2(0.5,0.55);
+ vec2 par=uTilt*0.045;
+ float aR=texture2D(uLogo,lp+par*1.7).a;
+ float aG=texture2D(uLogo,lp+par*0.85).a;
+ float aB=texture2D(uLogo,lp).a;
+ float aC=(aR+aG+aB)/3.0;
+ vec3 hot=thermal(clamp(1.35-heat*1.15,0.,1.));
+ hot=mix(hot,hot*hot*1.6,0.35);
+ col=mix(col,hot,min(1.0,aC*1.15));
+ col+=vec3(aR-aB,aG-aC,aB-aR)*0.85;
+ float rim=aC*(1.0-aC)*4.0;
+ col+=vec3(1.0,0.98,0.9)*rim*rim*0.85;
+ float bnd=sin((uv.x+uv.y)*70.0 - t*1.5 + uTilt.x*9.0);
+ col+=(0.5+0.5*cos(bnd*3.0+vec3(0.,2.1,4.2)))*smoothstep(0.955,1.0,bnd)*(0.16+0.22*abs(uTilt.x));
+ col*=0.95+0.05*sin(uv.y*uRes.y*3.1416);
+ float d=length((uv-0.5)*vec2(1.6,1.25));
+ col*=1.0-0.40*smoothstep(0.5,1.05,d);
+ gl_FragColor=vec4(col,1.0);
+}`;
+  const sh=(t,src)=>{const o=gl.createShader(t);gl.shaderSource(o,src);gl.compileShader(o);return o;};
+  prog=gl.createProgram();gl.attachShader(prog,sh(gl.VERTEX_SHADER,VS));gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(prog);
+  if(gl.getProgramParameter(prog,gl.LINK_STATUS)){
+    quad=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,quad);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+    logoTex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,logoTex);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,0]));
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    const im=new Image();
+    im.onload=()=>{gl.bindTexture(gl.TEXTURE_2D,logoTex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,im);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);glOK=true;badge.classList.add('gl-on');};
+    im.src='img/z-logo.png';
+  }
+}
+function sizeGL(){const d=Math.min(devicePixelRatio||1,2);
+  CW=Math.max(2,Math.round(cv.clientWidth*d));CH=Math.max(2,Math.round(cv.clientHeight*d));
+  cv.width=CW;cv.height=CH;}
+if(gl){ sizeGL(); if(window.ResizeObserver) new ResizeObserver(sizeGL).observe(cv); }
+
+// ── péndulo: la credencial cuelga y se hamaca hacia el mouse ──
+const hang=document.getElementById('acHang');
+let ang=0,vel=0,tx=0,ty=0,stop=false,t0=performance.now(),running=false;
+gate.addEventListener('pointermove',e=>{
+  tx=(e.clientX/innerWidth)*2-1;
+  ty=(e.clientY/innerHeight)*2-1;
+});
+function frame(now){
+  if(stop||gate.hidden||document.hidden){running=false;return;}
+  const t=(now-t0)/1000;
+  if(!reduced){
+    const target=tx*0.16+Math.sin(t*0.7)*0.035;      // hacia el mouse + vaivén propio
+    const acc=(target-ang)*8.0 - vel*3.2;             // resorte + amortiguación
+    vel+=acc*0.016; ang+=vel*0.016;
+    hang.style.transform='rotate('+(ang*57.2958)+'deg)';
+  }
+  if(glOK){
+    gl.viewport(0,0,CW,CH);
+    gl.useProgram(prog);
+    gl.bindBuffer(gl.ARRAY_BUFFER,quad);
+    const la=gl.getAttribLocation(prog,'a');gl.enableVertexAttribArray(la);gl.vertexAttribPointer(la,2,gl.FLOAT,false,0,0);
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,logoTex);
+    gl.uniform1i(gl.getUniformLocation(prog,'uLogo'),0);
+    gl.uniform2f(gl.getUniformLocation(prog,'uRes'),CW,CH);
+    gl.uniform1f(gl.getUniformLocation(prog,'uT'),t);
+    gl.uniform2f(gl.getUniformLocation(prog,'uTilt'),ang*3.2+tx*0.3,ty*0.6);   // el vaivén ES el holograma
+    gl.drawArrays(gl.TRIANGLES,0,3);
+  }
+  requestAnimationFrame(frame);
+}
+function startAll(){ if(running) return; running=true; sizeGL(); t0=performance.now(); requestAnimationFrame(frame); }
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&!gate.hidden&&!stop) startAll(); });
+
+if(!sessionStorage.getItem(KEY)) openGate();
 })();
 </script>
 </body></html>
