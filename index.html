@@ -23,6 +23,33 @@
   Esta app NO escribe Firebase, NO cobra, NO publica: client-side puro.
   Publicar en el subdominio labs.hg-vl.com = GATES (acción humana).
 
+  v3 (2026-08-28) — pedido del owner: "acceso con usuario y clave, botones para
+  googlear los comercios, pedidos ya y rappi, escanear más comercios y linkear
+  sus redes":
+    · ACCESO. La credencial dejó de ser decoración: es el login contra la MISMA
+      cuenta de Human Glitche que ya usa el resto del ecosistema — Firebase Auth
+      del proyecto hg-vl-shaders, patrón REST sin SDK de invitacion.html /
+      lobbies / equipos (sesión `hg_auth_session`, idToken que se renueva solo).
+      La clave la valida Google: nunca pasa por esta app ni vive en el código.
+      TENER CUENTA NO ES ENTRAR: el permiso lo contesta la base — solo pasa
+      quien esté en /admins o /moderators, y se revoca borrando ese uid en la
+      Console, sin republicar nada. La app NO arranca sin sesión válida.
+      (La v3 nació con un login PBKDF2 propio, hardcodeado en este archivo; se
+      reemplazó el mismo día al ver que el proyecto ya tenía Auth y roles.)
+    · OPERADOR. Quien entró firma lo que hace: las propuestas salen "Preparada
+      por X" y las cards del embudo guardan `by`.
+    · LINKS RÁPIDOS por comercio: Google, Google Maps, PedidosYa y Rappi, más
+      sus redes/web/mail. Verde = URL real hallada escaneando su web; punteado =
+      búsqueda en Google (`site:` para las apps de delivery).
+    · ESCANEAR LOTE: el Worker sobre TODOS los leads filtrados, de a 3, con
+      progreso y corte. Gratis (no gasta cuota de Google).
+    · El Worker hg-redes-scan pasó a v3 (además de redes detecta PedidosYa,
+      Rappi, MercadoLibre, YouTube/LinkedIn/X/Linktree y con qué plataforma está
+      hecha la web). Vender por app = 20-30% de comisión: eso ahora entra al
+      motor de recomendación (MENÚ + PEDIDOS y TIENDA + PAGOS). El deploy del
+      Worker está encolado; hasta que salga, esos campos vienen vacíos y la
+      ficha lo avisa.
+
   Construido directo bajo la excepción temporal de costo de CLAUDE.md (sin
   productor/guardian por ítem) — work_list.json deja el ítem en in_progress
   hasta la inspección completa diferida.
@@ -339,10 +366,65 @@
   :focus-visible{outline:2px solid var(--acid);outline-offset:2px;}
   @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;}}
 
-  /* ════ ACREDITACIÓN (gate de entrada) — credencial holo-térmica colgante ════
+  /* ── LINKS RÁPIDOS DEL COMERCIO (Google · Maps · delivery · sus redes) ── */
+  .bizlinks{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0 2px;}
+  .blink{display:inline-flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:9.5px;letter-spacing:.05em;padding:5px 9px;border-radius:20px;border:1px solid var(--line-s);color:var(--mut);background:transparent;cursor:pointer;white-space:nowrap;text-decoration:none;transition:.15s;}
+  .blink:hover{border-color:var(--acid);color:var(--acid);}
+  .blink.hit{border-color:rgba(90,216,138,.45);color:var(--ok);background:rgba(90,216,138,.06);}
+  .blink.hit:hover{border-color:var(--ok);color:var(--ok);}
+  .blink.ask{border-style:dashed;opacity:.55;}
+  .blink.ask:hover{opacity:1;}
+  .blink .bi{font-size:11px;line-height:1;}
+  .lcard .bizlinks{margin:8px 0 0;gap:4px;}
+  .lcard .blink{font-size:9px;padding:3px 7px;gap:4px;}
+  .linknote{font-size:9.5px;color:var(--dim);font-family:'Space Mono',monospace;line-height:1.7;margin:6px 0 2px;}
+  .platchip{font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-family:'Space Mono',monospace;color:var(--violet);border:1px solid rgba(125,123,255,.4);background:rgba(125,123,255,.08);border-radius:20px;padding:3px 9px;}
+
+  /* ── ESCANEO POR LOTE ── */
+  .batchpanel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 15px;margin-bottom:12px;}
+  .bp-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .bp-stats{font-size:10.5px;font-family:'Space Mono',monospace;color:var(--mut);line-height:1.6;}
+  .bp-stats b{color:var(--acid);font-weight:400;}
+  .bprog{height:8px;border-radius:20px;background:var(--panel2);border:1px solid var(--line);overflow:hidden;margin:10px 0 7px;display:none;}
+  .bprog.on{display:block;}
+  .bprog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--acid));transition:width .2s;}
+  .bplog{max-height:170px;overflow:auto;font-family:'Space Mono',monospace;font-size:10px;line-height:1.75;color:var(--mut);}
+  .bplog div{display:flex;gap:8px;}
+  .bplog .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(240,237,230,.75);}
+  .bplog .k{color:var(--ok);} .bplog .x{color:var(--glitch);} .bplog .z{color:var(--dim);}
+
+  /* ── OPERADOR (sesión) + CUENTA ── */
+  .opchip{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--mut);border:1px solid var(--line);border-radius:20px;padding:3px 10px;}
+  .opchip b{color:var(--acid);font-weight:400;}
+  .opchip[hidden]{display:none;}
+  .acmodal{position:fixed;inset:0;z-index:210;background:rgba(3,3,3,.88);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:18px;}
+  .acmodal[hidden]{display:none;}
+  .acmodal .box{background:var(--panel);border:1px solid var(--line-s);border-radius:14px;padding:18px 20px;width:min(540px,100%);max-height:86vh;overflow:auto;}
+  .acmodal h4{font-family:'Bebas Neue',sans-serif;font-weight:400;font-size:26px;letter-spacing:.04em;line-height:1;}
+  .acmodal .sub{font-family:'Space Mono',monospace;font-size:10px;color:var(--dim);letter-spacing:.1em;margin:4px 0 14px;}
+  .acmodal .fld{display:flex;flex-direction:column;gap:4px;margin-bottom:9px;}
+  .acmodal label{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-family:'Space Mono',monospace;}
+  .acmodal .row{display:flex;gap:7px;flex-wrap:wrap;align-items:center;}
+  .acmodal .out{font-family:'Space Mono',monospace;font-size:10.5px;background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--acid);border-radius:8px;padding:10px;white-space:pre-wrap;word-break:break-all;color:var(--acid);line-height:1.65;margin-top:8px;}
+  .acmodal .msg{font-family:'Space Mono',monospace;font-size:10px;min-height:14px;color:var(--glitch);margin-top:6px;line-height:1.5;}
+  .acmodal .msg.ok{color:var(--ok);}
+
+  /* ── LOGIN del gate ── */
+  .ac-login{position:relative;z-index:2;margin-top:22px;display:flex;flex-direction:column;gap:10px;width:min(330px,78vw);}
+  .ac-login .fld{display:flex;flex-direction:column;gap:5px;}
+  .ac-login label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);}
+  .ac-login input{background:rgba(10,10,12,.86);border:1px solid rgba(240,237,230,.22);color:var(--ink);font-family:'Space Mono',monospace;font-size:13px;padding:11px 12px;border-radius:9px;width:100%;}
+  .ac-login input:focus{outline:none;border-color:var(--acid);}
+  .ac-msg{min-height:16px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.05em;color:var(--glitch);text-align:center;line-height:1.55;}
+  .ac-msg.ok{color:var(--ok);} .ac-msg.warn{color:var(--gold);}
+  .ac-enter{width:100%;}
+  .ac-enter[disabled]{opacity:.45;cursor:not-allowed;}
+
+  /* ════ ACREDITACIÓN (login) — credencial holo-térmica colgante ════
      Mismo material que la Golden Ticket de demos-portal pero en formato
-     credencial vertical con cordón y física de péndulo. Una vez por sesión
-     (sessionStorage hg_labs_acred); link ACREDITACIÓN en el header la repite. */
+     credencial vertical con cordón y física de péndulo. Desde 2026-08-28 no es
+     decorativa: es la pantalla de acceso (usuario + clave, ver el script del
+     final). Sin sesión válida la app de atrás no arranca. */
   #acred{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow:hidden;
     background:radial-gradient(100% 80% at 50% 30%,#0b0b0e,#050505 75%);transition:opacity .5s ease;}
   #acred.out{opacity:0;pointer-events:none;}
@@ -401,17 +483,24 @@
       <div class="ac-slot" aria-hidden="true"></div>
       <div class="ac-head"><b>ZETA<br>LABS</b><span>OPERADOR</span></div>
       <div class="ac-body"><div class="ar">ACREDITACIÓN</div><div class="an">HUMAN<br>GLITCHE</div></div>
-      <div class="ac-foot"><div class="ac-bar" aria-hidden="true"></div><span class="ac-id"><span>HG-LABS-001</span><span>ACCESO TOTAL</span></span></div>
+      <div class="ac-foot"><div class="ac-bar" aria-hidden="true"></div><span class="ac-id"><span id="acIdCode">HG-LABS-001</span><span id="acIdRol">ACCESO RESTRINGIDO</span></span></div>
       <div class="ac-grainx" aria-hidden="true"></div>
     </div>
   </div>
-  <button class="ac-enter" id="acEnter">Entrar al laboratorio</button>
-  <div class="ac-hint">La credencial se mueve con tu mouse · entrá cuando quieras</div>
+  <form class="ac-login" id="acForm" autocomplete="on">
+    <div class="fld"><label for="acUser">Mail de tu cuenta HG</label>
+      <input id="acUser" name="username" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="vos@ejemplo.com"></div>
+    <div class="fld"><label for="acPass">Clave</label>
+      <input id="acPass" name="password" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+    <button class="ac-enter" id="acEnter" type="submit">Entrar al laboratorio</button>
+    <div class="ac-msg" id="acMsg"></div>
+  </form>
+  <div class="ac-hint">La misma cuenta de Human Glitche · <a href="#" id="acOlvide">olvidé mi clave</a></div>
 </div>
 <div class="wrap">
   <header class="top">
     <div class="brand"><b>ZETA</b> <em>LABS</em><span class="sub">captación y venta · todo alrededor del lead</span></div>
-    <div class="hdr-links"><a href="#" id="acLink">🪪 ACREDITACIÓN</a><a href="/labs/">← LABS</a><a href="/auditoria/">AUDITORÍA</a></div>
+    <div class="hdr-links"><span class="opchip" id="opChip" hidden>🪪 <b id="opName">—</b></span><a href="#" id="acCuenta">CUENTA</a><a href="#" id="acSalir">SALIR</a><a href="/labs/">← LABS</a><a href="/auditoria/">AUDITORÍA</a></div>
   </header>
 
   <nav class="tabs" id="tabs">
@@ -459,6 +548,7 @@
           <option value="name">Nombre A–Z</option>
         </select>
         <button class="btn sm" id="spToggle">🔎 Buscar negocios</button>
+        <button class="btn sm" id="bsToggle">⚡ Escanear lote</button>
       </div>
 
       <!-- BUSCADOR DE NEGOCIOS (Google Places, misma key/esquema que Auditoría y Depo Zeta) -->
@@ -473,6 +563,19 @@
         <div class="spstatus" id="spStatus"></div>
         <div class="spres" id="spResults"></div>
       </div>
+      <!-- ESCANEO POR LOTE — el mismo Worker que el ⚡ de un lead, sobre todos los que estás viendo -->
+      <div class="batchpanel" id="batchPanel" style="display:none">
+        <div class="bp-head">
+          <button class="btn pri sm" id="bsGo">⚡ Escanear pendientes</button>
+          <button class="btn sm" id="bsAll">↻ Re-escanear todos</button>
+          <button class="btn sm danger" id="bsStop" style="display:none">■ Cortar</button>
+          <span class="bp-stats" id="bsStats"></span>
+        </div>
+        <div class="bprog" id="bsProg"><i id="bsBar"></i></div>
+        <div class="bplog" id="bsLog"></div>
+        <p class="wanote">Baja la home de cada lead que estés viendo (mandan los filtros de arriba) y mira a qué <b>redes, apps de delivery y marketplaces</b> linkea. De a 3 en paralelo, cortable. Es gratis — no gasta cuota de Google, a diferencia de 🔎 Buscar negocios. Solo suma positivos: no encontrar una red no prueba que no la tenga, y nada de esto se escribe en la Auditoría pública.</p>
+      </div>
+
       <div class="lead-layout">
         <div>
           <div class="lead-grid" id="leadGrid"></div>
@@ -569,6 +672,38 @@
   <div class="foot">HUMAN GLITCHE · ZETA LABS · destino: labs.hg-vl.com (publicación pendiente de aprobación)</div>
 </div>
 <div class="toast" id="toast"></div>
+
+<!-- ════ CUENTA — cambiar mi clave / dar de alta operadores ════ -->
+<div class="acmodal" id="cuenta" hidden>
+  <div class="box">
+    <h4>CUENTA</h4>
+    <div class="sub" id="cuSes">—</div>
+
+    <div class="fld"><label for="cuNombre">① Tu nombre para los mensajes</label>
+      <input id="cuNombre" placeholder="Nico" autocomplete="name"></div>
+    <div class="row"><button class="btn sm" id="cuNombreSave">Guardar nombre</button>
+      <span class="wanote" style="margin:0">reemplaza <code>[tu nombre]</code> en el pitch de WhatsApp y firma la propuesta</span></div>
+    <div class="msg" id="cuMsg0"></div>
+
+    <div class="fld" style="margin-top:18px"><label>② Mi clave</label></div>
+    <div class="row"><button class="btn sm" id="cuReset">Mandarme el mail para cambiarla</button>
+      <span class="wanote" style="margin:0">la clave vive en tu cuenta de Google/Firebase, no en esta app</span></div>
+    <div class="msg" id="cuMsg"></div>
+
+    <div class="fld" style="margin-top:18px"><label>③ Sumar a alguien al equipo</label></div>
+    <p class="wanote" style="margin-top:0">Se hace una sola vez en la <b>Console de Firebase</b> (proyecto <code>hg-vl-shaders</code>), no acá:<br>
+      1 · <b>Authentication → Agregar usuario</b> con su mail y una clave.<br>
+      2 · <b>Realtime Database → <code>/moderators</code></b> → agregar su <code>uid</code> con valor <code>true</code> (o <code>/admins</code> si va a mandar).<br>
+      Para sacarle el acceso, borrás ese <code>uid</code>: en el próximo arranque no entra más, aunque tenga la sesión guardada.</p>
+
+    <p class="wanote" style="margin-top:14px">Esto es <b>auth de verdad</b>, no una cerradura pintada: la clave la valida Firebase (nunca pasa por esta app ni vive en el código), la sesión se renueva sola y se puede revocar desde la Console. <b>Tener cuenta no es entrar</b>: el permiso lo contesta la base — solo pasa quien esté en <code>/admins</code> o <code>/moderators</code>.</p>
+    <p class="wanote">Lo que sigue siendo cierto: los leads salen de una lectura <b>pública</b> de <code>/comercios</code>, así que el login protege la herramienta y firma el trabajo, no esos datos. Cerrarlos es cambiar una regla (<code>".read": "auth != null"</code>) y que la app lea con el token — está anotado.</p>
+    <div class="row" style="margin-top:12px;justify-content:space-between">
+      <button class="btn sm danger" id="cuSalir">Cerrar sesión</button>
+      <button class="btn sm" id="cuClose">Cerrar</button>
+    </div>
+  </div>
+</div>
 
 <script>
 (function(){
@@ -716,6 +851,7 @@ let props=[];                  // propuestas guardadas
 let priceOv={}, moneda='US$';
 let favs=new Set();
 let cfg={ marca:'Human Glitche', cont:'hola@hg-vl.com · hg-vl.com', sena:50, valid:15 };
+let operador=null;             // {u,rol} — quién está usando la app (login del gate)
 let editPrices=false;
 let scans={};                  // resultados del Worker por id de lead (solo este navegador)
 let localLeads={};             // leads sumados desde la búsqueda Google (solo este navegador)
@@ -755,8 +891,11 @@ function mergedBiz(id,b){
   const m={id,...b}, s=scans[id];
   if(!s) return m;
   if(s.alive===true) m.web=true;
-  for(const k of ['ig','fb','wa','tt']) if(s[k]===true) m[k]=true;
-  if(s.contacts) for(const k of ['igUrl','fbUrl','ttUrl','waPhone','email']) if(s.contacts[k]&&!m[k]) m[k]=s.contacts[k];
+  // redes (salud digital) + dónde más vende (worker v3: delivery/marketplace/otras)
+  for(const k of ['ig','fb','wa','tt','py','rp','ml','yt','li','xx','lk']) if(s[k]===true) m[k]=true;
+  if(s.plataforma&&!m.plataforma) m.plataforma=s.plataforma;
+  if(s.contacts) for(const k of ['igUrl','fbUrl','ttUrl','waPhone','email','pyUrl','rpUrl','mlUrl','ytUrl','liUrl','xUrl','lkUrl'])
+    if(s.contacts[k]&&!m[k]) m[k]=s.contacts[k];
   return m;
 }
 function getBiz(id){ const b=BIZ[id]; return b?mergedBiz(id,b):null; }
@@ -778,6 +917,74 @@ function todayStr(){ return new Date().toISOString().slice(0,10); }
 function fmtDate(ts){ return new Date(ts).toLocaleDateString('es-AR',{day:'2-digit',month:'short'}); }
 
 // ════════════════════════════════════════════════════════════════════════════
+// LINKS RÁPIDOS DEL COMERCIO — googlearlo, verlo en Maps, y saber si vende por
+// app; más sus redes en un toque.
+//   · Verde (.hit)  = URL REAL, salió del escaneo de su web (worker v3).
+//   · Punteado (.ask) = no la tenemos → abre la búsqueda que la encuentra.
+// Para PedidosYa/Rappi/redes sin confirmar se usa Google acotado con `site:`
+// en vez del buscador interno de cada app: esas apps piden dirección antes de
+// mostrar nada, y lo que uno quiere contestar es "¿está o no está?".
+// ════════════════════════════════════════════════════════════════════════════
+const PLAT_LABEL={tiendanube:'Tiendanube',empretienda:'Empretienda',mercadoshops:'MercadoShops',
+  shopify:'Shopify',woocommerce:'WooCommerce',wix:'Wix',squarespace:'Squarespace',
+  webflow:'Webflow',blogspot:'Blogspot',wordpress:'WordPress'};
+// qué mira el escaneo, en orden de utilidad para vender
+const SCAN_FLAGS=[{k:'ig',c:'igUrl',t:'IG'},{k:'fb',c:'fbUrl',t:'FB'},{k:'tt',c:'ttUrl',t:'TikTok'},
+  {k:'wa',c:'waPhone',t:'WA'},{k:'py',c:'pyUrl',t:'PedidosYa'},{k:'rp',c:'rpUrl',t:'Rappi'},
+  {k:'ml',c:'mlUrl',t:'MercadoLibre'},{k:'yt',c:'ytUrl',t:'YouTube'},{k:'li',c:'liUrl',t:'LinkedIn'},
+  {k:'xx',c:'xUrl',t:'X'},{k:'lk',c:'lkUrl',t:'Linktree'}];
+function scanHallazgosHtml(sc){
+  const c=sc.contacts||{};
+  return SCAN_FLAGS.filter(f=>sc[f.k]===true).map(f=>{
+    const bruto=f.k==='wa'?(c.waPhone?waLink(c.waPhone):''):(c[f.c]||'');
+    const href=hrefOk(bruto)?bruto:'';
+    const ev=(sc.evidence&&sc.evidence[f.k])||'';
+    return href?`<a href="${esc(href)}" target="_blank" rel="noopener" title="${esc(ev)}">${f.t} ✓</a>`
+               :`<a title="${esc(ev)}">${f.t} ✓</a>`;
+  }).join('');
+}
+const gq=t=>'https://www.google.com/search?q='+encodeURIComponent(t);
+const siteSearch=(dom,b)=>gq('site:'+dom+' "'+(b.name||'')+'" '+(b.city||''));
+const mapsLink=b=>'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent([b.name,b.address||b.city].filter(Boolean).join(' '));
+// solo http(s)/mailto: el website y los perfiles vienen de datos externos
+// (Firebase / Google Places / el escaneo), no de nosotros — un `javascript:`
+// pegado ahí no debe llegar a un href.
+const hrefOk=u=>/^(https?:|mailto:)/i.test(String(u||'').trim());
+function bizLinks(b){
+  const out=[];
+  const add=(ico,t,href,cls,title)=>{ if(hrefOk(href)) out.push({ico,t,href:String(href).trim(),cls:cls||'',title:title||''}); };
+  add('🔍','Google',gq([b.name,b.city].filter(Boolean).join(' ')),'','Googlearlo: web, redes, reseñas y quejas');
+  add('📍','Maps',mapsLink(b),'','Su ficha en Google Maps (reseñas, horarios, fotos)');
+  add('🛵','PedidosYa',b.pyUrl||siteSearch('pedidosya.com.ar',b),b.pyUrl?'hit':'ask',
+      b.pyUrl?'Está en PedidosYa — link hallado en su web':'¿Está en PedidosYa? (Google · site:pedidosya.com.ar)');
+  add('🛵','Rappi',b.rpUrl||siteSearch('rappi.com.ar',b),b.rpUrl?'hit':'ask',
+      b.rpUrl?'Está en Rappi — link hallado en su web':'¿Está en Rappi? (Google · site:rappi.com.ar)');
+  if(b.website) add('🌐','Su web',b.website,'hit','Abrir su sitio');
+  add('📷','Instagram',b.igUrl||siteSearch('instagram.com',b),b.igUrl?'hit':'ask',
+      b.igUrl?'Su Instagram (link hallado en su web)':'Buscar su Instagram en Google');
+  add('👍','Facebook',b.fbUrl||siteSearch('facebook.com',b),b.fbUrl?'hit':'ask',
+      b.fbUrl?'Su Facebook (link hallado en su web)':'Buscar su Facebook en Google');
+  add('♪','TikTok',b.ttUrl||siteSearch('tiktok.com',b),b.ttUrl?'hit':'ask',
+      b.ttUrl?'Su TikTok (link hallado en su web)':'Buscar su TikTok en Google');
+  const tel=b.waPhone||b.phone||'';
+  if(tel) add('💬','WhatsApp',waLink(tel),'hit','Abrir el chat en blanco (el botón con pitch está más abajo)');
+  if(b.email) add('✉',b.email,'mailto:'+b.email,'hit','Escribirle');
+  if(b.mlUrl) add('🛒','MercadoLibre',b.mlUrl,'hit','Vende en MercadoLibre — comisión y cliente ajeno');
+  if(b.ytUrl) add('▶','YouTube',b.ytUrl,'hit','');
+  if(b.liUrl) add('in','LinkedIn',b.liUrl,'hit','');
+  if(b.xUrl) add('𝕏','X',b.xUrl,'hit','');
+  if(b.lkUrl) add('🌳','Linktree',b.lkUrl,'hit','');
+  return out;
+}
+function bizLinksHtml(b,compact){
+  let ls=bizLinks(b);
+  if(compact) ls=ls.filter((x,i)=>i<4||x.cls==='hit').slice(0,8);
+  return '<div class="bizlinks">'+ls.map(x=>
+    `<a class="blink ${x.cls}" href="${esc(x.href)}" target="_blank" rel="noopener"${x.title?' title="'+esc(x.title)+'"':''}><span class="bi">${x.ico}</span>${esc(x.t)}</a>`
+  ).join('')+'</div>';
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // DIAGNÓSTICO / RECOMENDACIÓN — mismo motor que PIPELINES
 // ════════════════════════════════════════════════════════════════════════════
 function recoFor(p,b){
@@ -793,7 +1000,11 @@ function recoFor(p,b){
       if(b.ig===false) return r('Sin Instagram');
       if(b.tt===false) return r('Sin TikTok');
       break;
-    case 'menu':  if(typeMatch) return r('Vende comida/productos'); break;
+    case 'menu':
+      if(b.py===true&&b.rp===true) return r('Vende por PedidosYa Y Rappi: 20-30% de comisión');
+      if(b.py===true) return r('Está en PedidosYa: ~25% de comisión por pedido');
+      if(b.rp===true) return r('Está en Rappi: ~25% de comisión por pedido');
+      if(typeMatch) return r('Vende comida/productos'); break;
     case 'leads': if(typeMatch) return r('Vive de consultas'); if(b.web===true) return r('Ya tiene web: captá leads'); break;
     case 'resenas':
       if(typeof b.rating==='number'&&b.rating<4.0) return r('Calificación baja (★'+b.rating+')');
@@ -802,7 +1013,9 @@ function recoFor(p,b){
       break;
     case 'turnos':  if(typeMatch) return r('Trabaja con turnos'); break;
     case 'factura': if(typeMatch) return r('Factura seguido'); break;
-    case 'tienda':  if(typeMatch) return r('Vende productos'); break;
+    case 'tienda':
+      if(b.ml===true) return r('Vende en MercadoLibre: comisión y cliente ajeno');
+      if(typeMatch) return r('Vende productos'); break;
     case 'ads':     if(typeMatch) return r('Compite en su zona'); break;
     case 'email':   if(typeMatch) return r('Clientes que vuelven'); break;
     case 'brand':   if(b.web===false&&b.ig===false) return r('Arranca de cero: identidad primero'); break;
@@ -966,6 +1179,7 @@ function renderLeads(){
       <div class="lm">${esc([b.type,b.city].filter(Boolean).join(' · '))}</div>
       ${typeof b.rating==='number'?`<div class="lrate">★ ${b.rating}${b.reviews?' ('+b.reviews+')':''}</div>`:''}
       <div class="lchips">${chips}</div>
+      ${bizLinksHtml(b,true)}
       <div class="scorebar"><i style="width:${s/5*100}%"></i></div>
       <button class="fav-star${favs.has(b.id)?' on':''}" data-fav="${esc(b.id)}" title="Favorito">★</button>
     </div>`;
@@ -974,6 +1188,7 @@ function renderLeads(){
     <button class="btn sm" data-pg="-1" ${lPage<=1?'disabled':''}>◀</button>
     <span>${lPage} / ${pages} · ${list.length} leads</span>
     <button class="btn sm" data-pg="1" ${lPage>=pages?'disabled':''}>▶</button>`:(list.length?`<span>${list.length} leads</span>`:'');
+  updBatchStats();
   renderDetail();
 }
 $('q').addEventListener('input',e=>{ lQ=e.target.value; lPage=1; renderLeads(); });
@@ -1018,7 +1233,11 @@ function renderDetail(){
   };
   const topReco=recos[0];
   const guia=topReco?GUIA.find(g=>g.id===topReco.p.id):null;
-  const waMsg=guia?guia.wa.replace(/\[negocio\]/g,b.name||'tu negocio').replace(/\[ciudad\]/g,b.city||'tu ciudad'):'';
+  // el mensaje de la guía se firma con el nombre del operador (CUENTA); si no lo
+  // cargó queda el marcador [tu nombre] para que lo complete a mano, como antes.
+  const firma=(operador&&operador.nombre)?operador.nombre:'';
+  const waMsg=guia?guia.wa.replace(/\[negocio\]/g,b.name||'tu negocio').replace(/\[ciudad\]/g,b.city||'tu ciudad')
+    .replace(/\[tu nombre\]/g,firma||'[tu nombre]'):'';
   const waPhoneEf=b.phone||b.waPhone||'';
   const wa=waPhoneEf?waLink(waPhoneEf,waMsg):'';
   const nSel=detailSel.sel.size;
@@ -1033,13 +1252,12 @@ function renderDetail(){
       <div class="scanstatus" id="dScanStatus"></div>
       ${scan?`<div class="sr">
         ${scan.alive===false?'<span class="dead">web muerta ✗</span>':scan.alive===true?'<a href="'+esc(b.website)+'" target="_blank" rel="noopener">web viva ✓</a>':''}
-        ${scan.contacts&&scan.contacts.igUrl?'<a href="'+esc(scan.contacts.igUrl)+'" target="_blank" rel="noopener">IG ✓</a>':''}
-        ${scan.contacts&&scan.contacts.fbUrl?'<a href="'+esc(scan.contacts.fbUrl)+'" target="_blank" rel="noopener">FB ✓</a>':''}
-        ${scan.contacts&&scan.contacts.ttUrl?'<a href="'+esc(scan.contacts.ttUrl)+'" target="_blank" rel="noopener">TikTok ✓</a>':''}
-        ${scan.wa===true?(scan.contacts&&scan.contacts.waPhone?'<a href="'+esc(waLink(scan.contacts.waPhone))+'" target="_blank" rel="noopener">WA ✓ '+esc(scan.contacts.waPhone)+'</a>':'<a>WA ✓</a>'):''}
+        ${scanHallazgosHtml(scan)}
         ${scan.contacts&&scan.contacts.email?'<a href="mailto:'+esc(scan.contacts.email)+'">✉ '+esc(scan.contacts.email)+'</a>':''}
+        ${scan.plataforma?'<span class="platchip">⚙ '+esc(PLAT_LABEL[scan.plataforma]||scan.plataforma)+'</span>':''}
       </div>
-      <p class="wanote">Detección local escaneando su web (evidencia en los links). No escribe la Auditoría; y no encontrar una red en su web no prueba que no la tenga.</p>`:''}
+      ${(scan.v||1)<3?'<p class="wanote">Este escaneo salió de la versión vieja del Worker (solo redes). La v3 —PedidosYa, Rappi, MercadoLibre y con qué está hecha su web— está esperando deploy en la cola de aprobación: cuando salga, re-escaneá.</p>':''}
+      <p class="wanote">Detección local escaneando su web (pasá el mouse por cada hallazgo para ver el link que lo disparó). No escribe la Auditoría; y no encontrar una red en su web no prueba que no la tenga.</p>`:''}
     </div>`
     :`<p class="wanote">Sin web cargada — no hay qué escanear. Las redes de este lead se confirman a mano (o sumalo con web desde 🔎 Buscar negocios).</p>`;
   $('detail').innerHTML=`
@@ -1052,7 +1270,9 @@ function renderDetail(){
       <div class="t"><span>Salud digital</span><b>${s}/5</b></div>
       <div class="scorebar" style="height:8px"><i style="width:${s/5*100}%"></i></div>
     </div>
-    <div class="lchips" style="margin-bottom:4px">${CHANNELS.map(c=>`<span class="lch ${b[c.k]===true?'has':'no'}">${c.t} ${b[c.k]===true?'✓':'✗'}</span>`).join('')}</div>
+    <div class="lchips" style="margin-bottom:4px">${CHANNELS.map(c=>`<span class="lch ${b[c.k]===true?'has':'no'}">${c.t} ${b[c.k]===true?'✓':'✗'}</span>`).join('')}${b.plataforma?`<span class="platchip" title="Con qué está hecha su web — lo detectó el escaneo">⚙ ${esc(PLAT_LABEL[b.plataforma]||b.plataforma)}</span>`:''}</div>
+    ${bizLinksHtml(b)}
+    <p class="linknote">Verde = link real hallado escaneando su web · punteado = todavía no lo tenemos, abre la búsqueda en Google para confirmarlo a mano.</p>
     ${scanBox}
     <div class="d-actions">
       ${wa?`<a class="btn" href="${esc(wa)}" target="_blank" rel="noopener">💬 WhatsApp con pitch</a>`:''}
@@ -1117,7 +1337,8 @@ function ensureFunnelCard(b,stage){
   const recos=recosOf(b);
   const val=recos.slice(0,3).reduce((a,x)=>a+P(x.p.id).setup.precio,0);
   c={ id:uid(), name:b.name||'', city:b.city||'', type:b.type||'', stage:stage||'prospecto',
-      tags:recos.slice(0,3).map(x=>x.p.id), next:'', due:'', val:val?money(val):'', notes:'' };
+      tags:recos.slice(0,3).map(x=>x.p.id), next:'', due:'', val:val?money(val):'', notes:'',
+      by:operador?operador.u:'' };
   funnel.push(c); saveEmb();
   return c;
 }
@@ -1125,6 +1346,24 @@ function ensureFunnelCard(b,stage){
 // ════════════════════════════════════════════════════════════════════════════
 // ESCANEO DE REDES — Worker hg-redes-scan (detección local, no escribe Firebase)
 // ════════════════════════════════════════════════════════════════════════════
+// una sola puerta al Worker: la usan el ⚡ del detalle, el alta desde Google y
+// el escaneo por lote. Acepta payload viejo (v1, solo redes) y v3.
+async function pedirScan(url){
+  const r=await fetch(REDES_WORKER_URL+'?url='+encodeURIComponent(url),{cache:'no-store'});
+  if(!r.ok) throw new Error('el Worker respondió '+r.status);
+  const d=await r.json();
+  if(d.ok===false) throw new Error(d.error||'la web no respondió (timeout/DNS) — no prueba nada, probá de nuevo');
+  return d;
+}
+function guardarScan(id,d){
+  scans[id]={ ts:Date.now(), v:d.v||1, alive:d.alive, ig:d.ig, fb:d.fb, wa:d.wa, tt:d.tt,
+    py:!!d.py, rp:!!d.rp, ml:!!d.ml, yt:!!d.yt, li:!!d.li, xx:!!d.xx, lk:!!d.lk,
+    plataforma:d.plataforma||'', evidence:d.evidence||{}, contacts:d.contacts||{} };
+  saveScans();
+  // si es un lead local, los positivos quedan asentados en su registro persistido
+  if(localLeads[id]){ const m=mergedBiz(id,localLeads[id]); delete m.id; localLeads[id]=m; BIZ[id]=m; saveLocal(); }
+  return scans[id];
+}
 let scanRunning=false;
 async function scanLead(id){
   const b=BIZ[id]; if(!b||!b.website||scanRunning) return;
@@ -1132,23 +1371,83 @@ async function scanLead(id){
   const st=$('dScanStatus');
   if(st){ st.textContent='Escaneando '+b.website+'…'; st.className='scanstatus run'; }
   try{
-    const r=await fetch(REDES_WORKER_URL+'?url='+encodeURIComponent(b.website),{cache:'no-store'});
-    if(!r.ok) throw new Error('el Worker respondió '+r.status);
-    const d=await r.json();
-    if(d.ok===false) throw new Error(d.error||'la web no respondió (timeout/DNS) — no prueba nada, probá de nuevo');
-    scans[id]={ ts:Date.now(), alive:d.alive, ig:d.ig, fb:d.fb, wa:d.wa, tt:d.tt, evidence:d.evidence||{}, contacts:d.contacts||{} };
-    saveScans();
-    // si es un lead local, asentar los positivos en su registro persistido
-    if(localLeads[id]){ localLeads[id]=({...localLeads[id],...(function(){const m=mergedBiz(id,localLeads[id]);delete m.id;return m;})()}); saveLocal(); }
-    const halladas=['ig','fb','wa','tt'].filter(k=>d[k]===true).map(k=>k.toUpperCase());
+    const d=await pedirScan(b.website);
+    guardarScan(id,d);
+    const hall=SCAN_FLAGS.filter(f=>d[f.k]===true).map(f=>f.t);
     scanRunning=false;
     renderLeads();
-    toast(d.alive===false?'La web no responde (muerta)':halladas.length?('Redes halladas: '+halladas.join(' · ')):'Web viva, sin redes linkeadas en su home');
+    toast(d.alive===false?'La web no responde (muerta)':hall.length?('Hallado: '+hall.join(' · ')):'Web viva, sin nada linkeado en su home');
   }catch(e){
     scanRunning=false;
     if(st){ st.textContent='No se pudo escanear: '+e.message; st.className='scanstatus err'; }
   }
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// ESCANEAR MÁS COMERCIOS (lote) — el mismo Worker sobre TODOS los leads que
+// estás viendo. Los filtros de arriba son el lote: "sin web" + una ciudad =
+// escaneás esa ciudad. De a 3 en paralelo (el Worker corta a 8s cada una),
+// cortable en cualquier momento, y gratis: no toca la cuota de Google.
+// ════════════════════════════════════════════════════════════════════════════
+const batch={running:false,stop:false};
+const batchTargets=todos=>leadsFiltered().filter(b=>b.website&&(todos||!scans[b.id]));
+function updBatchStats(){
+  const panel=$('batchPanel');
+  if(!panel||panel.style.display==='none'||batch.running) return;
+  const vis=leadsFiltered(), conWeb=vis.filter(b=>b.website), pend=conWeb.filter(b=>!scans[b.id]);
+  $('bsStats').innerHTML=`en pantalla <b>${vis.length}</b> · con web <b>${conWeb.length}</b> · sin escanear <b>${pend.length}</b>`;
+  $('bsGo').disabled=!pend.length; $('bsAll').disabled=!conWeb.length;
+}
+function bLog(nombre,txt,cls){
+  $('bsLog').insertAdjacentHTML('afterbegin',
+    `<div><span class="nm">${esc(nombre)}</span><span class="${cls||'z'}">${esc(txt)}</span></div>`);
+}
+async function runBatch(todos){
+  if(batch.running) return;
+  const list=batchTargets(todos);
+  if(!list.length){ toast('No hay leads con web para escanear en esta vista'); return; }
+  if(list.length>40&&!confirm('Vas a escanear '+list.length+' webs contra el Worker. Es gratis, pero tarda un rato. ¿Dale?')) return;
+  batch.running=true; batch.stop=false;
+  $('bsStop').style.display=''; $('bsGo').disabled=true; $('bsAll').disabled=true;
+  $('bsProg').classList.add('on'); $('bsBar').style.width='0%'; $('bsLog').innerHTML='';
+  let i=0,hechos=0,conAlgo=0,apps=0,muertas=0,fallos=0;
+  const paso=async()=>{
+    while(!batch.stop){
+      const b=list[i++]; if(!b) return;
+      try{
+        const d=await pedirScan(b.website);
+        guardarScan(b.id,d);
+        const hall=SCAN_FLAGS.filter(f=>d[f.k]===true).map(f=>f.t);
+        if(d.py||d.rp||d.ml) apps++;
+        if(d.alive===false){ muertas++; bLog(b.name,'web muerta','x'); }
+        else if(hall.length){ conAlgo++; bLog(b.name,hall.join(' · '),'k'); }
+        else bLog(b.name,'web viva, sin links','z');
+      }catch(e){ fallos++; bLog(b.name,'✕ '+e.message,'x'); }
+      hechos++;
+      $('bsBar').style.width=Math.round(hechos/list.length*100)+'%';
+      $('bsStats').innerHTML=`escaneando <b>${hechos}</b>/${list.length} · con hallazgos <b>${conAlgo}</b> · venden por app <b>${apps}</b> · webs muertas <b>${muertas}</b>${fallos?' · fallos <b>'+fallos+'</b>':''}`;
+    }
+  };
+  await Promise.all([paso(),paso(),paso()]);
+  const cortado=batch.stop;
+  batch.running=false; batch.stop=false;
+  $('bsStop').style.display='none';
+  bLog('— '+(cortado?'CORTADO':'LOTE TERMINADO')+' —',hechos+' escaneados · '+conAlgo+' con hallazgos · '+apps+' venden por app','k');
+  refreshCounts(); renderLeads();
+  toast((cortado?'Lote cortado: ':'Lote listo: ')+hechos+' escaneados · '+conAlgo+' con hallazgos'+(apps?' · '+apps+' venden por app':''));
+}
+$('bsToggle').addEventListener('click',()=>{
+  const p=$('batchPanel');
+  const ver=p.style.display==='none';
+  p.style.display=ver?'block':'none';
+  if(ver) updBatchStats();
+});
+$('bsGo').addEventListener('click',()=>runBatch(false));
+$('bsAll').addEventListener('click',()=>{
+  if(!confirm('Re-escanear TODOS los leads con web de esta vista, incluso los ya escaneados. ¿Dale?')) return;
+  runBatch(true);
+});
+$('bsStop').addEventListener('click',()=>{ batch.stop=true; toast('Cortando el lote…'); });
 
 // ════════════════════════════════════════════════════════════════════════════
 // BUSCAR NEGOCIOS — Google Places, misma key y filosofía que la Auditoría:
@@ -1269,7 +1568,10 @@ function renderSearchResults(){
     return `<div class="spitem">
       <div class="sn"><b>${esc(r.name||'(sin nombre)')}</b><small>📍 ${esc(r.formatted_address||'sin dirección')}${typeof r.rating==='number'?' · ★ '+r.rating+(r.user_ratings_total?' ('+r.user_ratings_total+')':''):''}</small></div>
       ${dup?'<span class="dup">YA EN LA BASE</span>':''}
-      <button class="btn sm" data-spg="${i}">🔍 Google</button>
+      <a class="blink" href="${esc(gq((r.name||'')+' '+_zCity))}" target="_blank" rel="noopener"><span class="bi">🔍</span>Google</a>
+      <a class="blink" href="${esc(mapsLink({name:r.name,address:r.formatted_address||_zCity}))}" target="_blank" rel="noopener"><span class="bi">📍</span>Maps</a>
+      <a class="blink ask" href="${esc(siteSearch('pedidosya.com.ar',{name:r.name,city:_zCity}))}" target="_blank" rel="noopener" title="¿Está en PedidosYa?"><span class="bi">🛵</span>PY</a>
+      <a class="blink ask" href="${esc(siteSearch('rappi.com.ar',{name:r.name,city:_zCity}))}" target="_blank" rel="noopener" title="¿Está en Rappi?"><span class="bi">🛵</span>Rappi</a>
       <button class="btn sm" data-spadd="${i}" id="spAdd-${i}" ${dup?'disabled style="opacity:.4"':''}>${dup?'ya existe':'＋ Sumar a mis leads'}</button>
     </div>`;
   }).join('');
@@ -1303,20 +1605,10 @@ async function addLocalLead(i,silent){
   localLeads[id]=rec; BIZ[id]=rec; saveLocal();
   // cadena automática: si Google trajo web → el Worker detecta sus redes solo
   if(rec.website){
-    try{
-      const wr=await fetch(REDES_WORKER_URL+'?url='+encodeURIComponent(rec.website),{cache:'no-store'});
-      if(wr.ok){
-        const d=await wr.json();
-        if(d.ok!==false){
-          scans[id]={ ts:Date.now(), alive:d.alive, ig:d.ig, fb:d.fb, wa:d.wa, tt:d.tt, evidence:d.evidence||{}, contacts:d.contacts||{} };
-          saveScans();
-          const m=mergedBiz(id,rec); delete m.id;
-          localLeads[id]=m; BIZ[id]=m; saveLocal();
-        }
-      }
-    }catch(e){ /* el escaneo nunca rompe el alta */ }
+    try{ guardarScan(id,await pedirScan(rec.website)); }
+    catch(e){ /* el escaneo nunca rompe el alta */ }
   }
-  if(!silent){ refreshCounts(); renderLeads(); renderSearchResults(); toast('Sumado: '+rec.name+(scans[id]&&['ig','fb','wa','tt'].some(k=>scans[id][k])?' · redes detectadas ⚡':'')); }
+  if(!silent){ refreshCounts(); renderLeads(); renderSearchResults(); toast('Sumado: '+rec.name+(scans[id]&&SCAN_FLAGS.some(f=>scans[id][f.k])?' · redes detectadas ⚡':'')); }
   return true;
 }
 $('spToggle').addEventListener('click',()=>{
@@ -1327,10 +1619,6 @@ $('spToggle').addEventListener('click',()=>{
 });
 $('spGo').addEventListener('click',doSearchPlaces);
 $('spResults').addEventListener('click',async e=>{
-  const g=e.target.closest('[data-spg]');
-  if(g){ const r=_zResults[parseInt(g.getAttribute('data-spg'),10)];
-    if(r) window.open('https://www.google.com/search?q='+encodeURIComponent([r.name,_zCity].filter(Boolean).join(' ')),'_blank','noopener');
-    return; }
   const a=e.target.closest('[data-spadd]');
   if(a&&!a.disabled){
     const i=parseInt(a.getAttribute('data-spadd'),10);
@@ -1493,7 +1781,7 @@ function renderDoc(){
   $('doc').innerHTML=`
     <div class="dhead">
       <div class="dbrand">${brandHtml}<small>${esc(cfg.cont||'')}</small></div>
-      <div class="dmeta2">Propuesta<br><b>${hoy}</b><br>Válida por ${esc(String(cfg.valid||15))} días</div>
+      <div class="dmeta2">Propuesta<br><b>${hoy}</b><br>Válida por ${esc(String(cfg.valid||15))} días${operador?'<br>Preparada por '+esc(operador.nombre||operador.u):''}</div>
     </div>
     <div class="dtitle">Propuesta de servicios digitales</div>
     <div class="dfor">Para: <b>${esc(prop.neg||'—')}</b>${prop.ciu?' · '+esc(prop.ciu):''}${prop.at?' · a la atención de '+esc(prop.at):''}</div>
@@ -1581,7 +1869,7 @@ $('savePropBtn').addEventListener('click',()=>{
   if(!prop.sel.length){ toast('Elegí al menos un servicio'); return; }
   let setup=0, mens=0;
   prop.sel.forEach(id=>{ const pr=P(id); setup+=pr.setup.precio; mens+=pr.mensual.precio; });
-  props.unshift({ id:uid(), ts:Date.now(), neg:prop.neg, ciu:prop.ciu, sel:prop.sel.slice(), setup, mensual:mens, estado:'enviada' });
+  props.unshift({ id:uid(), ts:Date.now(), neg:prop.neg, ciu:prop.ciu, sel:prop.sel.slice(), setup, mensual:mens, estado:'enviada', by:operador?operador.u:'' });
   saveProps();
   // mueve (o crea) la card del embudo a Propuesta
   const b=(prop.fromLead&&getBiz(prop.fromLead))||{name:prop.neg,city:prop.ciu,type:''};
@@ -1592,7 +1880,7 @@ $('savePropBtn').addEventListener('click',()=>{
 function renderPropHist(){
   $('propHist').innerHTML=props.length?props.map(p=>`
     <div class="hrow">
-      <div class="hn"><b>${esc(p.neg||'—')}${p.ciu?' · '+esc(p.ciu):''}</b><small>${fmtDate(p.ts)} · ${p.sel.length} servicio(s)</small></div>
+      <div class="hn"><b>${esc(p.neg||'—')}${p.ciu?' · '+esc(p.ciu):''}</b><small>${fmtDate(p.ts)} · ${p.sel.length} servicio(s)${p.by?' · por '+esc(p.by):''}</small></div>
       <div class="hv">${money(p.setup)}${p.mensual>0?' +'+money(p.mensual)+'/mes':''}</div>
       <select data-pst="${esc(p.id)}">
         ${['enviada','aceptada','rechazada'].map(s=>`<option value="${s}"${p.estado===s?' selected':''}>${s}</option>`).join('')}
@@ -1858,18 +2146,28 @@ $('gGuide').addEventListener('click',e=>{
 // ════════════════════════════════════════════════════════════════════════════
 refreshCounts();
 renderPulso();
-loadBiz().then(()=>{
-  refreshCounts();
-  if(curView==='pulso') renderPulso();
-  if(curView==='leads') renderLeads();
-  // handoff compatible con AUDITORÍA: ?biz=Nombre&city=Ciudad
-  const hp=new URLSearchParams(location.search), nm=(hp.get('biz')||'').trim().toLowerCase();
-  if(nm){
-    const cy=(hp.get('city')||'').trim().toLowerCase();
-    const hit=Object.entries(BIZ).find(([id,b])=>(b.name||'').trim().toLowerCase()===nm&&(!cy||(b.city||'').trim().toLowerCase()===cy));
-    if(hit){ show('leads'); selectLead(hit[0]); }
-  }
-});
+// La app NO arranca sola: la enciende el login del gate (script de abajo) con
+// el operador que entró. Sin sesión válida no se pide ni un dato.
+let arrancado=false;
+function arrancar(op){
+  operador=op||null;
+  // volver a llamarla (p.ej. al guardar el nombre en CUENTA) solo refresca la firma
+  if(arrancado){ renderDetail(); return; }
+  arrancado=true;
+  loadBiz().then(()=>{
+    refreshCounts();
+    if(curView==='pulso') renderPulso();
+    if(curView==='leads') renderLeads();
+    // handoff compatible con AUDITORÍA: ?biz=Nombre&city=Ciudad
+    const hp=new URLSearchParams(location.search), nm=(hp.get('biz')||'').trim().toLowerCase();
+    if(nm){
+      const cy=(hp.get('city')||'').trim().toLowerCase();
+      const hit=Object.entries(BIZ).find(([id,b])=>(b.name||'').trim().toLowerCase()===nm&&(!cy||(b.city||'').trim().toLowerCase()===cy));
+      if(hit){ show('leads'); selectLead(hit[0]); }
+    }
+  });
+}
+window.ZETA={ arrancar, operador:()=>operador };
 })();
 </script>
 
@@ -1879,12 +2177,179 @@ loadBiz().then(()=>{
 'use strict';
 const gate=document.getElementById('acred');
 if(!gate) return;
-const KEY='hg_labs_acred';
-function openGate(){ gate.hidden=false; gate.classList.remove('out'); startAll(); }
-function closeGate(){ gate.classList.add('out'); sessionStorage.setItem(KEY,'1');
-  setTimeout(()=>{gate.hidden=true; stop=true;},550); }
-document.getElementById('acEnter').addEventListener('click',closeGate);
-document.getElementById('acLink')&&document.getElementById('acLink').addEventListener('click',e=>{e.preventDefault();sessionStorage.removeItem(KEY);stop=false;openGate();});
+const q=id=>document.getElementById(id);
+
+// ── ACCESO: cuenta de Human Glitche (Firebase Auth) ─────────────────────────
+// Auth REAL, no una cerradura pintada: la MISMA identidad que ya usa el resto
+// del ecosistema (proyecto hg-vl-shaders, email+clave habilitado). Patrón de la
+// casa — REST sin SDK, igual que invitacion.html / lobbies / equipos: sesión en
+// `hg_auth_session`, idToken que se renueva solo con el refreshToken.
+//
+// TENER CUENTA NO ES ENTRAR. A LABS entra solo quien esté en `/admins` o
+// `/moderators` de la base, y eso lo contesta el SERVIDOR con las reglas
+// puestas (`admins/.read: auth != null`), no el navegador. Se habilita y se
+// revoca desde la Console (Realtime Database → admins / moderators), en un
+// toque, sin tocar el código ni republicar la app.
+//
+// La apiKey y la databaseURL viajan en el HTML publicado y NO son secretos:
+// identifican al proyecto. Lo que protege es la regla, no el origen.
+const FB_URL='https://hg-vl-shaders-default-rtdb.firebaseio.com';
+const FB_API_KEY='AIzaSyAeMKHe7dj4bnaUzkF7iDANrC_cBtg4LAA';
+const SIGNIN_URL='https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword';
+const RESET_URL='https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode';
+const REFRESH_URL='https://securetoken.googleapis.com/v1/token';
+const LS_SES='hg_auth_session';     // misma clave y forma que las otras apps de HG
+const LS_PERFIL='hg_labs_perfil';   // nombre para firmar mensajes (local, sin cuenta)
+
+const verSesion=()=>{ try{ return JSON.parse(localStorage.getItem(LS_SES)||'null'); }catch(e){ return null; } };
+const guardarSesion=s=>{ try{ localStorage.setItem(LS_SES,JSON.stringify(s)); }catch(e){} };
+const borrarSesion=()=>{ try{ localStorage.removeItem(LS_SES); }catch(e){} };
+const verPerfil=()=>{ try{ return JSON.parse(localStorage.getItem(LS_PERFIL)||'{}')||{}; }catch(e){ return {}; } };
+const guardarPerfil=p=>{ try{ localStorage.setItem(LS_PERFIL,JSON.stringify(p)); }catch(e){} };
+const alias=mail=>String(mail||'').split('@')[0];
+
+async function tokenFresco(s){
+  if(!s||!s.refreshToken) return s?s.idToken:null;
+  try{
+    const r=await fetch(`${REFRESH_URL}?key=${FB_API_KEY}`,{method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:`grant_type=refresh_token&refresh_token=${encodeURIComponent(s.refreshToken)}`});
+    if(!r.ok) return s.idToken;
+    const d=await r.json();
+    s.idToken=d.id_token; s.refreshToken=d.refresh_token; guardarSesion(s);
+    return s.idToken;
+  }catch(e){ return s.idToken; }
+}
+
+// ¿Esta cuenta puede trabajar en LABS? Contesta la base, no el navegador.
+// Distingue los tres "no" que desde afuera se parecen: no tenés permiso /
+// tu sesión venció / no hay red — porque el mensaje al operador cambia.
+async function rolDe(uid,idToken){
+  const leer=async rama=>{
+    try{
+      const r=await fetch(`${FB_URL}/${rama}/${uid}.json?auth=${encodeURIComponent(idToken||'')}`,{cache:'no-store'});
+      if(r.status===401||r.status===403) return 'noauth';
+      if(!r.ok) return 'error';
+      return await r.json();          // true | null
+    }catch(e){ return 'error'; }
+  };
+  const [a,m]=await Promise.all([leer('admins'),leer('moderators')]);
+  if(a===true) return 'admin';
+  if(m===true) return 'moderador';
+  if(a==='noauth'&&m==='noauth') return 'vencida';
+  if(a==='error'&&m==='error') return 'sinred';
+  return null;                        // cuenta válida, sin permiso
+}
+
+const ERRORES={
+  EMAIL_NOT_FOUND:'Mail o clave incorrectos.',
+  INVALID_PASSWORD:'Mail o clave incorrectos.',
+  INVALID_LOGIN_CREDENTIALS:'Mail o clave incorrectos.',
+  INVALID_EMAIL:'Ese mail no tiene forma de mail.',
+  MISSING_PASSWORD:'Falta la clave.',
+  USER_DISABLED:'Esa cuenta está deshabilitada en Firebase.',
+  TOO_MANY_ATTEMPTS_TRY_LATER:'Firebase frenó la cuenta por muchos intentos: esperá un rato.',
+};
+const traducir=m=>ERRORES[String(m||'').split(' : ')[0]]||('No entró: '+(m||'error'));
+
+const form=q('acForm'), mailIn=q('acUser'), pIn=q('acPass'), btn=q('acEnter'), msgEl=q('acMsg');
+const opChip=q('opChip'), opName=q('opName');
+let SESION=null;
+function msg(t,cls){ msgEl.textContent=t||''; msgEl.className='ac-msg'+(cls?' '+cls:''); }
+
+function openGate(){ gate.hidden=false; gate.classList.remove('out'); startAll(); setTimeout(()=>mailIn.focus(),120); }
+
+function entrar(s,rol,animar){
+  SESION={...s,rol};
+  const nom=verPerfil().nombre||s.displayName||'';
+  opChip.hidden=false;
+  opName.textContent=alias(s.email)+' · '+rol;
+  q('acIdRol').textContent=rol.toUpperCase();
+  q('acIdCode').textContent='HG-LABS · '+alias(s.email).toUpperCase().slice(0,12);
+  if(animar){ gate.classList.add('out'); setTimeout(()=>{ gate.hidden=true; stop=true; },550); }
+  else { gate.hidden=true; stop=true; }
+  if(window.ZETA) window.ZETA.arrancar({u:alias(s.email), email:s.email, rol, nombre:nom});
+}
+
+mailIn.addEventListener('input',()=>{
+  const v=alias(mailIn.value).toUpperCase().slice(0,12);
+  q('acIdCode').textContent=v?('HG-LABS · '+v):'HG-LABS-001';
+});
+
+form.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const mail=mailIn.value.trim(), clave=pIn.value;
+  if(!mail||!clave){ msg('Mail y clave.'); return; }
+  btn.disabled=true; msg('Entrando…','ok');
+  try{
+    const r=await fetch(`${SIGNIN_URL}?key=${FB_API_KEY}`,{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:mail,password:clave,returnSecureToken:true})});
+    const d=await r.json();
+    if(!r.ok){ msg(traducir(d.error&&d.error.message)); pIn.value=''; btn.disabled=false; return; }
+    const s={uid:d.localId,email:mail,displayName:d.displayName||'',idToken:d.idToken,refreshToken:d.refreshToken};
+    guardarSesion(s);
+    msg('Verificando permiso…','ok');
+    const rol=await rolDe(s.uid,s.idToken);
+    btn.disabled=false;
+    if(rol==='admin'||rol==='moderador'){ pIn.value=''; msg('Acceso concedido','ok'); entrar(s,rol,true); return; }
+    if(rol==='sinred'){ msg('Entraste, pero no se pudo consultar el permiso: no hay red.'); return; }
+    borrarSesion();
+    msg('Tu cuenta entró a Firebase pero no está habilitada para LABS: un admin tiene que sumar tu uid a /moderators.','warn');
+  }catch(e){ btn.disabled=false; msg('Sin red o Firebase no responde.'); }
+});
+
+// "olvidé la clave": lo dispara el operador con su propio mail; Firebase manda
+// el link. Contestamos igual exista o no la cuenta (no delata quién existe).
+q('acOlvide').addEventListener('click',async e=>{
+  e.preventDefault();
+  const mail=mailIn.value.trim();
+  if(!mail){ msg('Escribí tu mail arriba y volvé a tocar acá.'); return; }
+  msg('Pidiendo el mail…','ok');
+  try{
+    const r=await fetch(`${RESET_URL}?key=${FB_API_KEY}`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({requestType:'PASSWORD_RESET',email:mail})});
+    if(r.ok||((await r.json().catch(()=>({}))).error||{}).message==='EMAIL_NOT_FOUND')
+      msg('Si esa cuenta existe, te llegó un mail para cambiar la clave.','ok');
+    else msg('Firebase no quiso mandar el mail. Probá de nuevo.');
+  }catch(e){ msg('Sin red o Firebase no responde.'); }
+});
+
+// ── CUENTA ──
+const modal=q('cuenta');
+function abrirCuenta(){
+  if(!SESION){ msg('Entrá primero.'); return; }
+  q('cuSes').textContent=SESION.email+' · '+SESION.rol+' · uid '+String(SESION.uid||'').slice(0,10)+'…';
+  q('cuNombre').value=verPerfil().nombre||SESION.displayName||'';
+  q('cuMsg0').textContent=''; q('cuMsg').textContent='';
+  modal.hidden=false;
+}
+q('acCuenta').addEventListener('click',e=>{ e.preventDefault(); abrirCuenta(); });
+q('acSalir').addEventListener('click',e=>{ e.preventDefault(); if(confirm('¿Cerrar la sesión de este equipo?')){ borrarSesion(); location.reload(); } });
+q('cuClose').addEventListener('click',()=>{ modal.hidden=true; });
+q('cuSalir').addEventListener('click',()=>{ if(confirm('¿Cerrar la sesión de este equipo?')){ borrarSesion(); location.reload(); } });
+modal.addEventListener('click',e=>{ if(e.target===modal) modal.hidden=true; });
+
+q('cuNombreSave').addEventListener('click',()=>{
+  if(!SESION) return;
+  const nombre=q('cuNombre').value.trim().slice(0,40);
+  guardarPerfil({...verPerfil(), nombre});
+  if(window.ZETA) window.ZETA.arrancar({u:alias(SESION.email), email:SESION.email, rol:SESION.rol, nombre});
+  const m=q('cuMsg0'); m.className='msg ok';
+  m.textContent=nombre?('Listo: los mensajes van a decir "Soy '+nombre+'".'):'Nombre borrado: vuelve el marcador [tu nombre].';
+});
+
+q('cuReset').addEventListener('click',async ()=>{
+  if(!SESION) return;
+  const m=q('cuMsg'); m.className='msg'; m.textContent='Pidiendo el mail…';
+  try{
+    const r=await fetch(`${RESET_URL}?key=${FB_API_KEY}`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({requestType:'PASSWORD_RESET',email:SESION.email})});
+    m.className='msg'+(r.ok?' ok':'');
+    m.textContent=r.ok?('Te mandamos el link a '+SESION.email+'. La clave se cambia en Google, no acá.')
+                      :'Firebase no quiso mandar el mail. Probá de nuevo.';
+  }catch(e){ m.textContent='Sin red o Firebase no responde.'; }
+});
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // reloj
@@ -2002,7 +2467,23 @@ function frame(now){
 function startAll(){ if(running) return; running=true; sizeGL(); t0=performance.now(); requestAnimationFrame(frame); }
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&!gate.hidden&&!stop) startAll(); });
 
-if(!sessionStorage.getItem(KEY)) openGate();
+// Arranque: si hay sesión guardada se renueva el token y se REVALIDA el permiso
+// contra la base (alcanza con sacar el uid de /moderators para que no entre más,
+// aunque el navegador tenga la sesión vieja guardada).
+(async ()=>{
+  const s0=verSesion();
+  if(s0&&s0.uid&&s0.refreshToken){
+    const t=await tokenFresco(s0);
+    const rol=await rolDe(s0.uid,t);
+    if(rol==='admin'||rol==='moderador'){ entrar({...s0,idToken:t},rol,false); return; }
+    openGate();
+    if(rol==='vencida'){ borrarSesion(); msg('Tu sesión venció: entrá de nuevo.'); }
+    else if(rol==='sinred') msg('No se pudo verificar tu permiso (sin red). Reintentá.');
+    else { borrarSesion(); msg('Tu cuenta ya no está habilitada para LABS.','warn'); }
+    return;
+  }
+  openGate();
+})();
 })();
 </script>
 </body></html>
