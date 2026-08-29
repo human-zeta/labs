@@ -541,6 +541,7 @@
         <button class="fchip" data-f="no-social">Sin redes</button>
         <button class="fchip" data-f="fav">★ Favoritos</button>
         <button class="fchip" data-f="funnel">En embudo</button>
+        <button class="fchip" data-f="local">📍 Mis leads</button>
         <select id="fSort">
           <option value="score">Peor salud primero</option>
           <option value="reviews">Más reseñas</option>
@@ -1146,6 +1147,7 @@ function leadsFiltered(){
   if(lFilter==='no-social') list=list.filter(b=>b.ig===false&&b.fb===false&&b.tt===false);
   if(lFilter==='fav') list=list.filter(b=>favs.has(b.id));
   if(lFilter==='funnel') list=list.filter(b=>!!funnelCardFor(b));
+  if(lFilter==='local') list=list.filter(b=>!!localLeads[b.id]);   // los que sumaste vos con 🔎
   if(lSort==='score') list.sort((a,b)=>scoreOf(a)-scoreOf(b)||(b.reviews||0)-(a.reviews||0));
   if(lSort==='reviews') list.sort((a,b)=>(b.reviews||0)-(a.reviews||0));
   if(lSort==='rating') list.sort((a,b)=>(b.rating||0)-(a.rating||0));
