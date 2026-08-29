@@ -1325,6 +1325,17 @@ function renderDetail(){
     let c=funnelCardFor(b);
     if(!stage){
       if(c){ funnel=funnel.filter(x=>x.id!==c.id); saveEmb(); toast('Sacado del embudo'); }
+      // Antes esto no hacía NADA en silencio: el operador completaba el
+      // seguimiento, tocaba Guardar con la etapa en "fuera del embudo" (el
+      // valor con el que viene) y creía haber cargado el lead. Pasó 3 veces
+      // el día del estreno. Si escribió algo, lo que quiere es sumarlo.
+      else if($('dNext').value.trim()||$('dNotes').value.trim()||$('dDue').value){
+        $('dStage').value='prospecto';
+        c=ensureFunnelCard(b,'prospecto');
+        c.next=$('dNext').value.trim(); c.due=$('dDue').value; c.notes=$('dNotes').value.trim();
+        saveEmb(); toast('Sumado al embudo como Prospecto (cambiale la etapa si va en otra)');
+      }
+      else toast('Elegí una etapa para sumarlo al embudo');
     }else{
       if(!c) c=ensureFunnelCard(b,stage);
       c.stage=stage; c.next=$('dNext').value.trim(); c.due=$('dDue').value; c.notes=$('dNotes').value.trim();
