@@ -21,8 +21,9 @@
       tags[],next,due,val,notes}); lo ya cargado aparece acá tal cual.
     · hg_aud_favs — favoritos de AUDITORÍA.
     · hg_zeta_propuestas / hg_zeta_cfg — nuevos, propios de esta app.
-  FUENTE DE LEADS: misma cadena que PIPELINES — Firebase /comercios (lectura
-  pública, si el backend está activo) → seed_comercios_pba.json → fallback demo.
+  FUENTE DE LEADS: Firebase /comercios, leído con el token del operador. Desde
+  2026-11-06 estos datos viven solo acá: el sitio público ya no los lee ni sirve
+  archivos con comercios, y AUDITORÍA pasó a ser búsqueda abierta con clave propia.
   Esta app NO escribe Firebase, NO cobra, NO publica: client-side puro.
   Publicar en el subdominio labs.hg-vl.com = GATES (acción humana).
 
@@ -503,7 +504,7 @@
 <div class="wrap">
   <header class="top">
     <div class="brand"><b>ZETA</b> <em>LABS</em><span class="sub">captación y venta · todo alrededor del lead</span></div>
-    <div class="hdr-links"><span class="opchip" id="opChip" hidden>🪪 <b id="opName">—</b></span><a href="#" id="acCuenta">CUENTA</a><a href="#" id="acSalir">SALIR</a><a href="https://www.hg-vl.com/labs/">← LABS</a><a href="https://www.hg-vl.com/auditoria/">AUDITORÍA</a></div>
+    <div class="hdr-links"><span class="opchip" id="opChip" hidden>🪪 <b id="opName">—</b></span><a href="/moderacion.html">MODERACIÓN</a><a href="#" id="acCuenta">CUENTA</a><a href="#" id="acSalir">SALIR</a><a href="https://www.hg-vl.com/labs/">← LABS</a><a href="https://www.hg-vl.com/auditoria/">AUDITORÍA</a></div>
   </header>
 
   <nav class="tabs" id="tabs">
@@ -514,6 +515,8 @@
     <button data-view="catalogo"><span class="tico">🔀</span> CATÁLOGO</button>
     <button data-view="guia"><span class="tico">📗</span> GUÍA</button>
   </nav>
+
+  <p id="leadsAviso" role="alert" hidden style="margin:0 0 14px;padding:10px 12px;border:1px solid rgba(255,204,51,.4);border-radius:8px;color:#ffcc33;font-size:12px;line-height:1.5;"></p>
 
   <main>
     <!-- ════════ PULSO ════════ -->
@@ -668,7 +671,7 @@
   <p class="note">
     <b>ZETA LABS</b> une AUDITORÍA + PIPELINES + PROPUESTA + EMBUDO + GUÍA alrededor de una sola
     entidad: el lead. Los datos de presencia digital vienen del relevamiento manual de la
-    Auditoría (Firebase público si está activo, o el seed local); nada se detecta ni se publica
+    base de comercios (Firebase, con tu sesión); nada se detecta ni se publica
     solo. Precios, embudo y propuestas viven en este navegador y son compatibles con las apps
     clásicas de LABS. Esta app no cobra, no escribe Firebase y no envía nada: el envío de una
     propuesta al cliente lo hacés vos (imprimir/PDF o copiar texto).
@@ -701,7 +704,7 @@
       Para sacarle el acceso, borrás ese <code>uid</code>: en el próximo arranque no entra más, aunque tenga la sesión guardada.</p>
 
     <p class="wanote" style="margin-top:14px">Esto es <b>auth de verdad</b>, no una cerradura pintada: la clave la valida Firebase (nunca pasa por esta app ni vive en el código), la sesión se renueva sola y se puede revocar desde la Console. <b>Tener cuenta no es entrar</b>: el permiso lo contesta la base — solo pasa quien esté en <code>/admins</code> o <code>/moderators</code>.</p>
-    <p class="wanote">Lo que sigue siendo cierto: los leads salen de una lectura <b>pública</b> de <code>/comercios</code>, así que el login protege la herramienta y firma el trabajo, no esos datos. Cerrarlos es cambiar una regla (<code>".read": "auth != null"</code>) y que la app lea con el token — está anotado.</p>
+    <p class="wanote">Los leads se leen de <code>/comercios</code> con tu sesión: solo los ven las cuentas de <code>/admins</code> y <code>/moderators</code>. El sitio público no los lee ni los sirve.</p>
     <div class="row" style="margin-top:12px;justify-content:space-between">
       <button class="btn sm danger" id="cuSalir">Cerrar sesión</button>
       <button class="btn sm" id="cuClose">Cerrar</button>
@@ -849,7 +852,7 @@ const PLACE_TYPE_MAP={
   gym:'Gimnasio', bicycle_store:'Bicicletería', pet_store:'Petshop', laundry:'Lavandería'
 };
 
-let BIZ={};                    // leads relevados (Firebase/seed) id → biz
+let BIZ={};                    // leads relevados (Firebase, con token) id → biz
 let funnel=[];                 // cards embudo {id,name,city,type,stage,tags[],next,due,val,notes}
 let props=[];                  // propuestas guardadas
 let priceOv={}, moneda='US$';
@@ -1031,27 +1034,26 @@ function recoFor(p,b){
 function recosOf(b){ return PIPELINES.map(p=>({p,...recoFor(p,b)})).filter(x=>x.rec); }
 
 // ════════════════════════════════════════════════════════════════════════════
-// CARGA DE LEADS — misma cadena que PIPELINES (Firebase → seed → fallback)
+// CARGA DE LEADS — Firebase /comercios con el token del operador; sin copias estáticas
 // ════════════════════════════════════════════════════════════════════════════
-const FALLBACK={
-  demo_a:{name:'Panadería La Tradición', type:'Panadería', city:'La Plata', web:false, ig:false, fb:true, wa:false, tt:false, rating:4.7, reviews:312, phone:'0221 507-3002'},
-  demo_b:{name:'Barbería Norte', type:'Barbería', city:'Quilmes', web:false, ig:true, fb:false, wa:false, tt:false, rating:4.4, reviews:88},
-  demo_c:{name:'Estudio Contable Méndez', type:'Profesional', city:'Mar del Plata', web:true, ig:false, fb:false, wa:true, tt:false, rating:4.9, reviews:21},
-  demo_d:{name:'Veterinaria Patitas', type:'Veterinaria', city:'Tandil', web:false, ig:true, fb:true, wa:true, tt:false, rating:4.6, reviews:140},
-};
 async function loadBiz(){
-  const PATHS=['https://hg-vl-shaders-default-rtdb.firebaseio.com/comercios.json','/seed_comercios_pba.json','/auditoria/seed_comercios_pba.json','../auditoria/seed_comercios_pba.json','seed_comercios_pba.json'];
-  for(const path of PATHS){
-    try{
-      const r=await fetch(path,{cache:'no-store'});
-      if(!r.ok) continue;
-      const d=await r.json();
-      const obj=(d&&typeof d==='object'&&!Array.isArray(d))?d:{};
-      if(!Object.keys(obj).length) continue;
-      BIZ=obj; mergeLocalLeads(); return;
-    }catch(e){}
+  const aviso=$('leadsAviso');
+  aviso.hidden=true; aviso.textContent='';
+  try{
+    const token=operador&&operador.token?await operador.token():'';
+    const r=await fetch('https://hg-vl-shaders-default-rtdb.firebaseio.com/comercios.json?auth='+encodeURIComponent(token||''),{cache:'no-store'});
+    if(!r.ok) throw new Error(r.status===401||r.status===403?'permiso':'http');
+    const d=await r.json();
+    BIZ=(d&&typeof d==='object'&&!Array.isArray(d))?d:{};
+  }catch(e){
+    // Nunca mostrar datos de muestra como si fueran leads: decirlo y seguir con los locales.
+    BIZ={};
+    aviso.textContent=e.message==='permiso'
+      ?'No se pudieron leer los leads: tu cuenta no tiene permiso o la sesión venció. Entrá de nuevo.'
+      :'No se pudieron leer los leads: revisá la conexión y recargá. Por ahora ves solo los que sumaste en este navegador.';
+    aviso.hidden=false;
   }
-  BIZ={...FALLBACK}; mergeLocalLeads();
+  mergeLocalLeads();
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1468,7 +1470,7 @@ $('bsStop').addEventListener('click',()=>{ batch.stop=true; toast('Cortando el l
 // ════════════════════════════════════════════════════════════════════════════
 // BUSCAR NEGOCIOS — Google Places, misma key y filosofía que la Auditoría:
 // 100% manual (nunca se dispara sola), cuota paga del usuario, resultados a
-// LEADS LOCALES de este navegador (la Auditoría pública se alimenta solo desde
+// LEADS LOCALES de este navegador (la base de comercios se alimenta solo desde
 // su panel de moderación = gate). Al sumar: Place Details (web+tel, pago) y
 // escaneo de redes automático vía Worker si tiene web.
 // ════════════════════════════════════════════════════════════════════════════
@@ -2284,7 +2286,7 @@ function entrar(s,rol,animar){
   q('acIdCode').textContent='HG-LABS · '+alias(s.email).toUpperCase().slice(0,12);
   if(animar){ gate.classList.add('out'); setTimeout(()=>{ gate.hidden=true; stop=true; },550); }
   else { gate.hidden=true; stop=true; }
-  if(window.ZETA) window.ZETA.arrancar({u:alias(s.email), email:s.email, rol, nombre:nom});
+  if(window.ZETA) window.ZETA.arrancar({u:alias(s.email), email:s.email, rol, nombre:nom, token:()=>tokenFresco(s)});
 }
 
 mailIn.addEventListener('input',()=>{
@@ -2350,7 +2352,7 @@ q('cuNombreSave').addEventListener('click',()=>{
   if(!SESION) return;
   const nombre=q('cuNombre').value.trim().slice(0,40);
   guardarPerfil({...verPerfil(), nombre});
-  if(window.ZETA) window.ZETA.arrancar({u:alias(SESION.email), email:SESION.email, rol:SESION.rol, nombre});
+  if(window.ZETA) window.ZETA.arrancar({u:alias(SESION.email), email:SESION.email, rol:SESION.rol, nombre, token:()=>tokenFresco(SESION)});
   const m=q('cuMsg0'); m.className='msg ok';
   m.textContent=nombre?('Listo: los mensajes van a decir "Soy '+nombre+'".'):'Nombre borrado: vuelve el marcador [tu nombre].';
 });
